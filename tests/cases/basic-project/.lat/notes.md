@@ -2,7 +2,7 @@
 
 ## First Topic
 
-Some content here.
+Run `vitest` to test.
 
 ## Second Topic
 

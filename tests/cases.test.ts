@@ -60,6 +60,22 @@ describe('basic-project', () => {
     expect(formatting.body).toBe('Prettier all the things.');
   });
 
+  // @lat: [[tests#Section Parsing#Renders inline code in body]]
+  it('renders inline code in body text', async () => {
+    const sections = await loadAllSections(lat);
+    const flat = flattenSections(sections);
+    const first = flat.find((s) => s.id === 'notes#First Topic')!;
+    expect(first.body).toBe('Run `vitest` to test.');
+  });
+
+  // @lat: [[tests#Section Parsing#Renders wiki links in body]]
+  it('renders wiki links in body text', async () => {
+    const sections = await loadAllSections(lat);
+    const flat = flattenSections(sections);
+    const second = flat.find((s) => s.id === 'notes#Second Topic')!;
+    expect(second.body).toBe('See [[dev-process#Testing]] for more.');
+  });
+
   // @lat: [[tests#Ref Extraction#Extracts wiki link references]]
   it('extracts wiki link references', async () => {
     const files = await listLatticeFiles(lat);

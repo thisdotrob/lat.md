@@ -3,7 +3,7 @@ import { dirname, join, basename, resolve } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { parse } from './parser.js';
 import { visit } from 'unist-util-visit';
-import type { Heading, Paragraph, Text } from 'mdast';
+import type { Heading, RootContent, Text } from 'mdast';
 import type { WikiLink } from './extensions/wiki-link/types.js';
 
 export type Section = {
@@ -71,10 +71,15 @@ function headingText(node: Heading): string {
     .join('');
 }
 
-function paragraphText(node: Paragraph): string {
+function inlineText(node: { children: RootContent[] }): string {
   return node.children
-    .filter((c): c is Text => c.type === 'text')
-    .map((c) => c.value)
+    .map((c) => {
+      if (c.type === 'text') return c.value;
+      if (c.type === 'inlineCode') return '`' + c.value + '`';
+      if (c.type === 'wikiLink') return '[[' + c.value + ']]';
+      if ('children' in c) return inlineText(c as { children: RootContent[] });
+      return '';
+    })
     .join('');
 }
 
@@ -145,7 +150,7 @@ export function parseSections(filePath: string, content: string): Section[] {
       for (let j = i + 1; j < children.length; j++) {
         if (children[j].type === 'heading') break;
         if (children[j].type === 'paragraph') {
-          flat[headingIdx].body = paragraphText(children[j] as Paragraph);
+          flat[headingIdx].body = inlineText(children[j] as unknown as { children: RootContent[] });
           break;
         }
       }

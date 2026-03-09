@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   listLatticeFiles,
+  loadAllSections,
+  findSections,
   parseSections,
   extractRefs,
   flattenSections,
@@ -18,31 +20,46 @@ export async function refsCmd(
   query: string,
   scope: Scope,
 ): Promise<void> {
+  const allSections = await loadAllSections(ctx.latDir);
+  const matches = findSections(allSections, query);
+
+  if (matches.length === 0) {
+    console.error(ctx.chalk.red(`No section matching "${query}"`));
+    process.exit(1);
+  }
+
+  // Require exact full-path match
   const q = query.toLowerCase();
+  const flat = flattenSections(allSections);
+  const exactMatch = flat.find((s) => s.id.toLowerCase() === q);
+  if (!exactMatch) {
+    console.error(ctx.chalk.red(`No section "${query}" found.`));
+    if (matches.length > 0) {
+      console.error(ctx.chalk.dim('\nDid you mean:\n'));
+      for (const m of matches) {
+        console.error('  ' + ctx.chalk.white(m.id));
+      }
+    }
+    process.exit(1);
+  }
+
+  const targetId = exactMatch.id.toLowerCase();
   let hasOutput = false;
 
   if (scope === 'md' || scope === 'md+code') {
     const files = await listLatticeFiles(ctx.latDir);
-    const allSections: Section[] = [];
-    const allContents: string[] = [];
+    const matchingFromSections = new Set<string>();
     for (const file of files) {
       const content = await readFile(file, 'utf-8');
-      allContents.push(content);
-      allSections.push(...parseSections(file, content));
-    }
-
-    const matchingFromSections = new Set<string>();
-    for (let i = 0; i < files.length; i++) {
-      const fileRefs = extractRefs(files[i], allContents[i]);
+      const fileRefs = extractRefs(file, content);
       for (const ref of fileRefs) {
-        if (ref.target.toLowerCase() === q) {
+        if (ref.target.toLowerCase() === targetId) {
           matchingFromSections.add(ref.fromSection.toLowerCase());
         }
       }
     }
 
     if (matchingFromSections.size > 0) {
-      const flat = flattenSections(allSections);
       const referrers = flat.filter((s) =>
         matchingFromSections.has(s.id.toLowerCase()),
       );
@@ -59,7 +76,7 @@ export async function refsCmd(
     const projectRoot = join(ctx.latDir, '..');
     const codeRefs = await scanCodeRefs(projectRoot);
     for (const ref of codeRefs) {
-      if (ref.target.toLowerCase() === q) {
+      if (ref.target.toLowerCase() === targetId) {
         if (hasOutput) console.log('');
         console.log(`  ${ref.file}:${ref.line}`);
         hasOutput = true;
@@ -68,7 +85,7 @@ export async function refsCmd(
   }
 
   if (!hasOutput) {
-    console.error(ctx.chalk.red(`No references to "${query}" found`));
+    console.error(ctx.chalk.red(`No references to "${exactMatch.id}" found`));
     process.exit(1);
   }
 }
