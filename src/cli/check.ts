@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import {
-  findLatticeDir,
   listLatticeFiles,
   loadAllSections,
   extractRefs,
@@ -11,6 +10,7 @@ import {
   type Section,
 } from '../lattice.js';
 import { scanCodeRefs } from '../code-refs.js';
+import type { CliContext } from './context.js';
 
 export type CheckError = {
   file: string;
@@ -59,7 +59,6 @@ export async function checkCodeRefs(
   const codeRefs = await scanCodeRefs(projectRoot);
   const errors: CheckError[] = [];
 
-  // 1. Check that all @lat: comments point to real sections
   const mentionedSections = new Set<string>();
   for (const ref of codeRefs) {
     const target = ref.target.toLowerCase();
@@ -74,7 +73,6 @@ export async function checkCodeRefs(
     }
   }
 
-  // 2. Check require-code-mention coverage
   const files = await listLatticeFiles(latticeDir);
   for (const file of files) {
     const content = await readFile(file, 'utf-8');
@@ -101,60 +99,41 @@ export async function checkCodeRefs(
   return errors;
 }
 
-// Legacy export for existing tests
-export async function checkLinks(latticeDir: string): Promise<CheckError[]> {
-  return checkMd(latticeDir);
-}
-
-function formatErrors(errors: CheckError[]): void {
+function formatErrors(ctx: CliContext, errors: CheckError[]): void {
   for (const err of errors) {
-    console.error(`${err.file}:${err.line}: ${err.message}`);
+    console.error(
+      `${ctx.chalk.cyan(err.file + ':' + err.line)}: ${ctx.chalk.red(err.message)}`,
+    );
   }
   if (errors.length > 0) {
     console.error(
-      `\n${errors.length} error${errors.length === 1 ? '' : 's'} found`,
+      ctx.chalk.red(
+        `\n${errors.length} error${errors.length === 1 ? '' : 's'} found`,
+      ),
     );
   }
 }
 
-export async function check(args: string[]): Promise<void> {
-  const latticeDir = findLatticeDir();
-  if (!latticeDir) {
-    console.error('No .lat directory found');
-    process.exit(1);
-  }
+export async function checkMdCmd(ctx: CliContext): Promise<void> {
+  const errors = await checkMd(ctx.latDir);
+  formatErrors(ctx, errors);
+  if (errors.length > 0) process.exit(1);
+  console.log(ctx.chalk.green('md: All links OK'));
+}
 
-  const subcommand = args[0];
+export async function checkCodeRefsCmd(ctx: CliContext): Promise<void> {
+  const errors = await checkCodeRefs(ctx.latDir);
+  formatErrors(ctx, errors);
+  if (errors.length > 0) process.exit(1);
+  console.log(ctx.chalk.green('code-refs: All references OK'));
+}
 
-  if (subcommand === 'md') {
-    const errors = await checkMd(latticeDir);
-    formatErrors(errors);
-    if (errors.length > 0) process.exit(1);
-    console.log('md: All links OK');
-    return;
-  }
-
-  if (subcommand === 'code-refs') {
-    const errors = await checkCodeRefs(latticeDir);
-    formatErrors(errors);
-    if (errors.length > 0) process.exit(1);
-    console.log('code-refs: All references OK');
-    return;
-  }
-
-  if (subcommand && subcommand !== 'md' && subcommand !== 'code-refs') {
-    console.error(
-      `Unknown check subcommand: ${subcommand}\n\nUsage: lat check [md|code-refs]`,
-    );
-    process.exit(1);
-  }
-
-  // No subcommand: run all checks
-  const mdErrors = await checkMd(latticeDir);
-  const codeErrors = await checkCodeRefs(latticeDir);
+export async function checkAllCmd(ctx: CliContext): Promise<void> {
+  const mdErrors = await checkMd(ctx.latDir);
+  const codeErrors = await checkCodeRefs(ctx.latDir);
   const allErrors = [...mdErrors, ...codeErrors];
 
-  formatErrors(allErrors);
+  formatErrors(ctx, allErrors);
   if (allErrors.length > 0) process.exit(1);
-  console.log('All checks passed');
+  console.log(ctx.chalk.green('All checks passed'));
 }

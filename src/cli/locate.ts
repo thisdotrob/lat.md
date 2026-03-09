@@ -1,30 +1,21 @@
-import { findLatticeDir, loadAllSections, findSections } from '../lattice.js';
+import { loadAllSections, findSections } from '../lattice.js';
 import { formatSectionPreview } from '../format.js';
+import type { CliContext } from './context.js';
 
-export async function locate(args: string[]): Promise<void> {
-  if (args.length < 1) {
-    console.error('Usage: lat locate <query>');
-    process.exit(1);
-  }
-
-  const query = args[0];
-
-  const latticeDir = findLatticeDir();
-  if (!latticeDir) {
-    console.error('No .lat directory found');
-    process.exit(1);
-  }
-
-  const sections = await loadAllSections(latticeDir);
+export async function locateCmd(
+  ctx: CliContext,
+  query: string,
+): Promise<void> {
+  const sections = await loadAllSections(ctx.latDir);
   const matches = findSections(sections, query);
 
   if (matches.length === 0) {
-    console.error(`No sections matching "${query}"`);
+    console.error(ctx.chalk.red(`No sections matching "${query}"`));
     process.exit(1);
   }
 
   for (let i = 0; i < matches.length; i++) {
     if (i > 0) console.log('');
-    console.log(formatSectionPreview(matches[i], latticeDir));
+    console.log(formatSectionPreview(matches[i], ctx.latDir));
   }
 }
