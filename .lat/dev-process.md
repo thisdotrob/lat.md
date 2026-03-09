@@ -2,7 +2,7 @@
 
 ## Tooling
 
-TypeScript ESM project (`"type": "module"`). Strict types enforced — `tsc --noEmit` runs as a [[Dev Process#Testing#Typecheck Test]].
+TypeScript ESM project (`"type": "module"`). Strict types enforced — `tsc --noEmit` runs as a [[dev-process#Testing#Typecheck Test]].
 
 ## Package Manager
 
@@ -27,4 +27,4 @@ Prettier with no semicolons, single quotes, trailing commas. Run `pnpm format` b
 
 ## Publishing
 
-Published to npm as `lat.md`. The `bin` entry exposes the `lat` command. Only `dist/src` is included in the package — tests and the [[Website]] are excluded.
+Published to npm as `lat.md`. The `bin` entry exposes the `lat` command. Only `dist/src` is included in the package — tests and the [[website]] are excluded.

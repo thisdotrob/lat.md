@@ -6,4 +6,4 @@ Some content here.
 
 ## Second Topic
 
-See [[Dev Process#Testing]] for more.
+See [[dev-process#Testing]] for more.

@@ -20,7 +20,7 @@ Verify that `startLine`, `endLine`, and `body` are correctly extracted from head
 
 ### Extracts wiki link references
 
-Parse a file containing [[Parser#Wiki Links]] and verify `extractRefs` returns correct targets, enclosing section ids, file stems, and line numbers.
+Parse a file containing [[parser#Wiki Links]] and verify `extractRefs` returns correct targets, enclosing section ids, file stems, and line numbers.
 
 ### Returns empty for files without links
 
@@ -30,31 +30,31 @@ Verify `extractRefs` returns an empty array when a file has no wiki links.
 
 ### Formats section with body
 
-Verify [[CLI#Section Preview]] output includes section id, file path with line range, and indented body text.
+Verify [[cli#Section Preview]] output includes section id, file path with line range, and indented body text.
 
 ### Formats section without body
 
-Verify [[CLI#Section Preview]] omits the body lines when a section has no paragraph content.
+Verify [[cli#Section Preview]] omits the body lines when a section has no paragraph content.
 
 ## Check MD
 
 ### Detects broken links
 
-Given a file with a wiki link pointing to a nonexistent section, [[CLI#check#md]] should report it as a broken link.
+Given a file with a wiki link pointing to a nonexistent section, [[cli#check#md]] should report it as a broken link.
 
 ### Passes with valid links
 
-Given files where all wiki links resolve to existing sections, [[CLI#check#md]] should report no errors.
+Given files where all wiki links resolve to existing sections, [[cli#check#md]] should report no errors.
 
 ## Check Code Refs
 
 ### Detects dangling code ref
 
-Given a source file with `@lat: [[Nonexistent]]`, [[CLI#check#code-refs]] should report it as pointing to a nonexistent section.
+Given a source file with `@lat: [[Nonexistent]]`, [[cli#check#code-refs]] should report it as pointing to a nonexistent section.
 
 ### Detects missing code mention for required file
 
-Given a `.lat` file with [[Markdown#Frontmatter#require-code-mention]] and a leaf section not referenced by any `@lat:` comment in the codebase, [[CLI#check#code-refs]] should report the uncovered section.
+Given a `.lat` file with [[markdown#Frontmatter#require-code-mention]] and a leaf section not referenced by any `@lat:` comment in the codebase, [[cli#check#code-refs]] should report the uncovered section.
 
 ## Locate
 

@@ -18,7 +18,7 @@ Here comes the detailed high-level test description
 Then the agent can be instructed to provide a test for `[[Cancelling a service mid-month]]`. The agent can then locate the test description and write the actual source code for the test, marking it with an in-code comment like
 
 ```typescript
-// @lat: [[Tests#Billing#Cancelling a service mid-month should refund the user the remainding days]]
+// @lat: [[tests#Billing#Cancelling a service mid-month should refund the user the remainding days]]
 describe("...", () => { ... });
 ```
 

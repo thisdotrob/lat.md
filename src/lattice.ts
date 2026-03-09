@@ -102,7 +102,7 @@ export function parseSections(filePath: string, content: string): Section[] {
     }
 
     const parent = stack.length > 0 ? stack[stack.length - 1] : null;
-    const id = parent ? `${parent.id}#${heading}` : heading;
+    const id = parent ? `${parent.id}#${heading}` : file;
 
     const section: Section = {
       id,
@@ -205,7 +205,7 @@ export function extractRefs(filePath: string, content: string): Ref[] {
       stack.pop();
     }
     const parent = stack.length > 0 ? stack[stack.length - 1] : null;
-    const id = parent ? `${parent.id}#${heading}` : heading;
+    const id = parent ? `${parent.id}#${heading}` : file;
     flat[idx].id = id;
     stack.push({ id, depth });
     idx++;
