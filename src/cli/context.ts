@@ -16,7 +16,7 @@ export function resolveContext(opts: {
     chalk.level = 0;
   }
 
-  const latDir = opts.dir ?? findLatticeDir() ?? '';
+  const latDir = findLatticeDir(opts.dir) ?? '';
   if (!latDir) {
     console.error(chalk.red('No .lat directory found'));
     process.exit(1);

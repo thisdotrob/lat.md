@@ -29,7 +29,7 @@ program
   .name('lat')
   .description('Anchor source code to high-level concepts defined in markdown')
   .version(version)
-  .option('--dir <path>', 'path to lat files (default: .lat in your project)')
+  .option('--dir <path>', 'project root to look for .lat in (default: cwd)')
   .option('--no-color', 'disable color output');
 
 program
