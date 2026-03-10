@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+// Suppress deprecation warnings from transitive dependencies unless --verbose
+if (!process.argv.includes('--verbose')) {
+  process.noDeprecation = true;
+}
+
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +35,8 @@ program
   .description('Anchor source code to high-level concepts defined in markdown')
   .version(version)
   .option('--dir <path>', 'project root to look for lat.md in (default: cwd)')
-  .option('--no-color', 'disable color output');
+  .option('--no-color', 'disable color output')
+  .option('--verbose', 'show deprecation warnings and extra diagnostics');
 
 program
   .command('locate')
