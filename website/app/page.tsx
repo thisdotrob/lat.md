@@ -33,11 +33,11 @@ export default function Home() {
     >
       {/* Logo */}
       <pre
+        className="nosel"
         style={{
           fontSize: 'clamp(6px, 1.8vw, 15px)',
           lineHeight: 1.2,
           letterSpacing: '0.05em',
-          userSelect: 'none',
           margin: 0,
         }}
       >
@@ -76,7 +76,7 @@ export default function Home() {
             boxSizing: 'border-box',
           }}
         >
-          <span style={{ color: '#555' }}>$ </span>
+          <span className="nosel" style={{ color: '#555' }}>$ </span>
           npm i -g lat.md
         </code>
         <div
