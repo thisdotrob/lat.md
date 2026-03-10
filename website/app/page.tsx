@@ -102,11 +102,11 @@ export default function Home() {
           color: '#555',
         }}
       >
+        <li>* Plain markdown: readable by humans, parseable by agents</li>
         <li>* Wiki links connect concepts into a navigable graph</li>
         <li>* <Cmd>// @lat:</Cmd> and <Cmd># @lat:</Cmd> comments tie source code to specs</li>
         <li>* <Cmd>lat check</Cmd> ensures nothing drifts out of sync</li>
-        <li>* Semantic vector search across all sections</li>
-        <li>* Plain markdown: readable by humans, parseable by agents</li>
+        <li>* <Cmd>lat search</Cmd> for semantic vector search across all sections</li>
         <li style={{ marginTop: '1em' }}>
           <span style={{ color: '#555' }}>Read the </span>
           <a
