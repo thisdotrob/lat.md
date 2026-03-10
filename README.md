@@ -26,7 +26,7 @@ The result is a structured knowledge base that:
 npm install -g lat.md
 ```
 
-Or use directly with `npx lat.md <command>`.
+Or use directly with `npx lat.md@latest <command>`.
 
 ## How it works
 
