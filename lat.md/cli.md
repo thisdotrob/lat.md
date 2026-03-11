@@ -98,6 +98,7 @@ Usage: `lat init [dir]`
 Steps:
 1. **lat.md/ directory** — if not present, asks whether to create it. Scaffolds from `templates/init/` (`.gitignore` and `README.md`). If it already exists, skips ahead.
 2. **AGENTS.md / CLAUDE.md** — if neither file exists, offers to generate both from the built-in template (same as [[cli#gen]]). If one or both already exist, suggests running `lat gen agents.md` to preview the template and incorporate manually.
+3. **Claude Code prompt hook** — installs a `UserPromptSubmit` hook that injects a per-prompt reminder for the agent to consult lat.md via `lat search` and `lat prompt` before working. Copies `templates/lat-prompt-hook.sh` to `.claude/hooks/` and registers it in `.claude/settings.json`. Idempotent — detects if the hook is already configured and skips.
 
 Implementation: `src/cli/init.ts`
 
