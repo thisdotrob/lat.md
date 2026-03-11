@@ -31,7 +31,7 @@ Each section has:
 
 References can use just the file name (without directory path) when the name is unique across the vault. For example, `[[search#Provider Detection]]` resolves to `tests/search#Provider Detection` if there's only one `search.md` in the vault. If multiple files share the same name, the full path is required — `lat check` reports ambiguous refs as errors.
 
-Resolution is handled by `resolveRef()` in `src/lattice.ts` and used consistently across `lat check`, `lat refs`, `lat prompt`, and `findSections`.
+Resolution is handled by `resolveRef()` in `src/lattice.ts` for strict contexts (`lat check`, `lat refs`) where authored links must resolve unambiguously. Lenient contexts (`lat locate`, `lat prompt`) use `findSections()` directly, which has its own file stem expansion built in — it does not call `resolveRef`.
 
 ## Refs Extraction
 

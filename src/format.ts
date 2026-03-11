@@ -1,6 +1,6 @@
 import { relative } from 'node:path';
 import chalk from 'chalk';
-import type { Section } from './lattice.js';
+import type { Section, SectionMatch } from './lattice.js';
 
 export function formatSectionId(id: string): string {
   const parts = id.split('#');
@@ -13,19 +13,18 @@ export function formatSectionId(id: string): string {
 export function formatSectionPreview(
   section: Section,
   latticeDir: string,
-  opts?: { index?: number },
+  opts?: { reason?: string },
 ): string {
   const relPath = relative(
     process.cwd(),
     latticeDir + '/' + section.file + '.md',
   );
 
-  const prefix = opts?.index != null ? `${chalk.dim(`${opts.index}.`)} ` : '  ';
-  const indent = opts?.index != null ? '   ' : '  ';
-
+  const kind = section.id.includes('#') ? 'Section' : 'File';
+  const reasonSuffix = opts?.reason ? ' ' + chalk.dim(`(${opts.reason})`) : '';
   const lines: string[] = [
-    `${prefix}${formatSectionId(section.id)}`,
-    `${indent}${chalk.dim('Defined in')} ${chalk.cyan(relPath)}${chalk.dim(`:${section.startLine}-${section.endLine}`)}`,
+    `${chalk.dim('*')} ${chalk.dim(kind + ':')} [[${formatSectionId(section.id)}]]${reasonSuffix}`,
+    `  ${chalk.dim('Defined in')} ${chalk.cyan(relPath)}${chalk.dim(`:${section.startLine}-${section.endLine}`)}`,
   ];
 
   if (section.body) {
@@ -34,7 +33,7 @@ export function formatSectionPreview(
         ? section.body.slice(0, 200) + '...'
         : section.body;
     lines.push('');
-    lines.push(`${indent}${chalk.dim('>')} ${truncated}`);
+    lines.push(`  ${chalk.dim('>')} ${truncated}`);
   }
 
   return lines.join('\n');
@@ -42,17 +41,16 @@ export function formatSectionPreview(
 
 export function formatResultList(
   header: string,
-  sections: Section[],
+  matches: SectionMatch[],
   latticeDir: string,
-  opts?: { numbered?: boolean },
 ): string {
   const lines: string[] = ['', chalk.bold(header), ''];
 
-  for (let i = 0; i < sections.length; i++) {
+  for (let i = 0; i < matches.length; i++) {
     if (i > 0) lines.push('');
     lines.push(
-      formatSectionPreview(sections[i], latticeDir, {
-        index: opts?.numbered ? i + 1 : undefined,
+      formatSectionPreview(matches[i].section, latticeDir, {
+        reason: matches[i].reason,
       }),
     );
   }

@@ -19,4 +19,5 @@ High-level test descriptions. Actual test code lives in `tests/`.
 - **refs-e2e.md** — End-to-end tests for the refs command
 - **search.md** — Semantic search provider detection and RAG replay tests
 - **check-index.md** — Validating directory index files
+- **prompt.md** — Prompt command ref expansion and context block formatting
 - **ref-resolution.md** — Wiki link and code ref resolution across vault subdirectories

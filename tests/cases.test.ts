@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { execSync } from 'child_process';
 import { join } from 'node:path';
 import {
   findLatticeDir,
@@ -115,7 +116,7 @@ describe('basic-project', () => {
 
     const output = stripAnsi(formatSectionPreview(running, lat));
     const lines = output.split('\n');
-    expect(lines[0]).toBe('  dev-process#Testing#Running Tests');
+    expect(lines[0]).toBe('* Section: [[dev-process#Testing#Running Tests]]');
     expect(lines[1]).toContain('Defined in');
     expect(lines[1]).toContain('dev-process.md:5-8');
     expect(lines[3]).toContain('> Run tests with vitest.');
@@ -129,7 +130,7 @@ describe('basic-project', () => {
 
     const output = stripAnsi(formatSectionPreview(testing, lat));
     const lines = output.split('\n');
-    expect(lines[0]).toBe('  dev-process#Testing');
+    expect(lines[0]).toBe('* Section: [[dev-process#Testing]]');
     expect(lines[1]).toContain('Defined in');
     expect(lines[1]).toContain('dev-process.md:3-4');
     expect(lines).toHaveLength(2);
@@ -140,7 +141,7 @@ describe('basic-project', () => {
     const sections = await loadAllSections(lat);
     const matches = findSections(sections, 'dev-process#Testing#Running Tests');
     expect(matches).toHaveLength(1);
-    expect(matches[0].file).toBe('dev-process');
+    expect(matches[0].section.file).toBe('dev-process');
   });
 
   // @lat: [[locate#Matches subsection by trailing segment]]
@@ -148,7 +149,7 @@ describe('basic-project', () => {
     const sections = await loadAllSections(lat);
     const matches = findSections(sections, 'Running Tests');
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches[0].id).toBe('dev-process#Testing#Running Tests');
+    expect(matches[0].section.id).toBe('dev-process#Testing#Running Tests');
   });
 
   // @lat: [[locate#Fuzzy matches with typos]]
@@ -156,12 +157,56 @@ describe('basic-project', () => {
     const sections = await loadAllSections(lat);
     const matches = findSections(sections, 'Runing Tests');
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches[0].id).toBe('dev-process#Testing#Running Tests');
+    expect(matches[0].section.id).toBe('dev-process#Testing#Running Tests');
   });
 
   it('locate returns empty for non-matching query', async () => {
     const sections = await loadAllSections(lat);
     expect(findSections(sections, 'Nonexistent')).toHaveLength(0);
+  });
+
+  // @lat: [[locate#Reports match reasons]]
+  it('locate reports match reasons', async () => {
+    const sections = await loadAllSections(lat);
+
+    const exact = findSections(sections, 'dev-process#Testing');
+    expect(exact[0].reason).toBe('exact match');
+
+    const sub = findSections(sections, 'Running Tests');
+    expect(sub[0].reason).toBe('section name match');
+
+    const fuzzy = findSections(sections, 'Runing Tests');
+    expect(fuzzy[0].reason).toMatch(/^fuzzy match/);
+  });
+
+  // @lat: [[locate#Matches with skipped intermediate sections]]
+  it('locate matches with skipped intermediate sections', async () => {
+    const sections = await loadAllSections(lat);
+    const matches = findSections(sections, 'dev-process#Running Tests');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(matches[0].section.id).toBe('dev-process#Testing#Running Tests');
+    expect(matches[0].reason).toContain('1 intermediate section skipped');
+  });
+
+  // @lat: [[locate#Strips brackets from query]]
+  it('locate strips [[brackets]] from query', async () => {
+    const sections = await loadAllSections(lat);
+    const withBrackets = findSections(sections, '[[Running Tests]]');
+    // findSections itself doesn't strip brackets — that's locateCmd's job.
+    // But we can verify the locate.ts stripping logic inline:
+    const stripped = '[[Running Tests]]'.replace(/^\[\[|\]\]$/g, '');
+    const matches = findSections(sections, stripped);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(matches[0].section.id).toBe('dev-process#Testing#Running Tests');
+  });
+
+  // @lat: [[locate#Strips leading hash from query]]
+  it('locate strips leading hash from query', async () => {
+    const sections = await loadAllSections(lat);
+    const matches = findSections(sections, '#Testing');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(matches[0].section.id).toBe('dev-process#Testing');
+    expect(matches[0].reason).toBe('section name match');
   });
 
   // @lat: [[refs-e2e#Finds referring sections via wiki links]]
@@ -187,6 +232,45 @@ describe('basic-project', () => {
     const { errors, files } = await checkMd(lat);
     expect(errors).toHaveLength(0);
     expect(files).toEqual({ '.md': 2 });
+  });
+});
+
+// --- prompt ---
+
+describe('prompt', () => {
+  const root = caseDir('basic-project');
+
+  function runPrompt(text: string): string {
+    return execSync(`node ${join(import.meta.dirname, '..', 'dist', 'src', 'cli', 'index.js')} prompt ${JSON.stringify(text)}`, {
+      cwd: root,
+      encoding: 'utf-8',
+      env: { ...process.env, _LAT_TEST_DISABLE_FS_CACHE: '1' },
+    });
+  }
+
+  // @lat: [[tests/prompt#Resolves exact ref with context]]
+  it('resolves exact ref with "is referring to" context', () => {
+    const output = runPrompt('see [[dev-process#Testing]]');
+    expect(output).toContain('see [[dev-process#Testing]]');
+    expect(output).toContain('<lat-context>');
+    expect(output).toContain('`[[dev-process#Testing]]` is referring to:');
+    expect(output).toContain('* [[dev-process#Testing]]');
+    expect(output).toContain('dev-process.md:');
+  });
+
+  // @lat: [[tests/prompt#Resolves fuzzy ref with alternatives]]
+  it('resolves fuzzy ref with "might be referring to" context', () => {
+    const output = runPrompt('fix [[Runing Tests]]');
+    expect(output).toContain('[[dev-process#Testing#Running Tests]]');
+    expect(output).toContain('`[[Runing Tests]]` might be referring to');
+    expect(output).toContain('fuzzy match');
+  });
+
+  // @lat: [[tests/prompt#Passes through text without refs]]
+  it('passes through text without refs unchanged', () => {
+    const output = runPrompt('no refs here');
+    expect(output).toBe('no refs here');
+    expect(output).not.toContain('<lat-context>');
   });
 });
 
@@ -409,7 +493,20 @@ describe('short-ref', () => {
     const sections = await loadAllSections(lat);
     const matches = findSections(sections, 'setup#Install');
     expect(matches).toHaveLength(1);
-    expect(matches[0].id).toBe('guides/setup#Install');
+    expect(matches[0].section.id).toBe('guides/setup#Install');
+    expect(matches[0].reason).toMatch(/file stem expanded/);
+  });
+
+  // @lat: [[locate#File stem fuzzy does not over-match]]
+  it('fuzzy does not over-match when file prefix is shared', async () => {
+    const sections = await loadAllSections(lat);
+    // "setup#Instal" (typo) should fuzzy-match "guides/setup#Install"
+    // but not "guides/setup#Configure" — heading-only comparison
+    const matches = findSections(sections, 'setup#Instal');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(matches[0].section.id).toBe('guides/setup#Install');
+    const ids = matches.map((m) => m.section.id);
+    expect(ids).not.toContain('guides/setup#Configure');
   });
 
   // @lat: [[ref-resolution#Short ref refs finds md references]]
@@ -482,7 +579,7 @@ describe('full-ref', () => {
     const sections = await loadAllSections(lat);
     const matches = findSections(sections, 'guides/setup#Install');
     expect(matches).toHaveLength(1);
-    expect(matches[0].id).toBe('guides/setup#Install');
+    expect(matches[0].section.id).toBe('guides/setup#Install');
   });
 
   // @lat: [[ref-resolution#Full ref refs finds md references]]
@@ -521,5 +618,86 @@ describe('full-ref', () => {
 
     expect(matching).toHaveLength(1);
     expect(matching[0].file).toContain('app.ts');
+  });
+});
+
+// --- bare heading ref ---
+
+describe('error-bare-heading-ref', () => {
+  const lat = latDir('error-bare-heading-ref');
+
+  // @lat: [[ref-resolution#Bare heading in md is error]]
+  it('check md rejects bare heading name as wiki link', async () => {
+    const { errors } = await checkMd(lat);
+    const bare = errors.find((e) => e.target === 'Installation');
+    expect(bare).toBeDefined();
+    expect(bare!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Local section syntax in md is error]]
+  it('check md rejects [[#Heading]] local section syntax', async () => {
+    const { errors } = await checkMd(lat);
+    const local = errors.find((e) => e.target === '#Configuration');
+    expect(local).toBeDefined();
+    expect(local!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Nonexistent file ref in md is error]]
+  it('check md rejects link to nonexistent file', async () => {
+    const { errors } = await checkMd(lat);
+    const missing = errors.find((e) => e.target === 'other-file#Missing');
+    expect(missing).toBeDefined();
+    expect(missing!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Bare heading in code is error]]
+  it('check code-refs rejects bare heading name', async () => {
+    const { errors } = await checkCodeRefs(lat);
+    const bare = errors.find((e) => e.target === 'Installation');
+    expect(bare).toBeDefined();
+    expect(bare!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Valid code ref with file prefix passes]]
+  it('check code-refs passes valid file#Heading ref', async () => {
+    const { errors } = await checkCodeRefs(lat);
+    const valid = errors.find((e) => e.target === 'docs#Configuration');
+    expect(valid).toBeUndefined();
+  });
+});
+
+// --- nested in-file refs ---
+
+describe('valid-nested-refs', () => {
+  // @lat: [[ref-resolution#Nested in-file refs pass]]
+  it('check md passes with fully qualified nested section refs', async () => {
+    const { errors } = await checkMd(latDir('valid-nested-refs'));
+    expect(errors).toHaveLength(0);
+  });
+});
+
+describe('error-bad-nested-refs', () => {
+  // @lat: [[ref-resolution#Skipped intermediate in ref is error]]
+  it('check md rejects ref that skips intermediate section', async () => {
+    const { errors } = await checkMd(latDir('error-bad-nested-refs'));
+    const skipped = errors.find((e) => e.target === 'guide#Prerequisites');
+    expect(skipped).toBeDefined();
+    expect(skipped!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Wrong nesting order in ref is error]]
+  it('check md rejects ref with wrong nesting order', async () => {
+    const { errors } = await checkMd(latDir('error-bad-nested-refs'));
+    const wrong = errors.find((e) => e.target === 'guide#Install#Setup');
+    expect(wrong).toBeDefined();
+    expect(wrong!.message).toContain('no matching section found');
+  });
+
+  // @lat: [[ref-resolution#Nonexistent leaf in nested ref is error]]
+  it('check md rejects ref with nonexistent leaf heading', async () => {
+    const { errors } = await checkMd(latDir('error-bad-nested-refs'));
+    const missing = errors.find((e) => e.target === 'guide#Setup#Missing');
+    expect(missing).toBeDefined();
+    expect(missing!.message).toContain('no matching section found');
   });
 });

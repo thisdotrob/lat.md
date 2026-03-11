@@ -312,52 +312,185 @@ export function resolveRef(
 
 const MAX_DISTANCE_RATIO = 0.4;
 
-export function findSections(sections: Section[], query: string): Section[] {
-  const flat = flattenSections(sections);
-  const isFullPath = query.includes('#');
+export type SectionMatch = {
+  section: Section;
+  reason: string;
+};
 
-  // Tier 0: resolve short refs (e.g. search#X → tests/search#X)
-  const sectionIds = new Set(flat.map((s) => s.id.toLowerCase()));
-  const fileIndex = buildFileIndex(sections);
-  const { resolved } = resolveRef(query, sectionIds, fileIndex);
-  const q = resolved.toLowerCase();
+export function findSections(
+  sections: Section[],
+  query: string,
+): SectionMatch[] {
+  const flat = flattenSections(sections);
+  // Leading # means "search for a heading", strip it
+  const normalized = query.startsWith('#') ? query.slice(1) : query;
+  const q = normalized.toLowerCase();
+  const isFullPath = normalized.includes('#');
 
   // Tier 1: exact full-id match
   const exact = flat.filter((s) => s.id.toLowerCase() === q);
-  if (exact.length > 0 && isFullPath) return exact;
+  const exactMatches: SectionMatch[] = exact.map((s) => ({
+    section: s,
+    reason: 'exact match',
+  }));
+  if (exactMatches.length > 0 && isFullPath) return exactMatches;
+
+  // Tier 1b: file stem expansion
+  // For bare names: "locate" → matches root section of "tests/locate.md"
+  // For paths with #: "setup#Install" → expands to "guides/setup#Install"
+  const fileIndex = buildFileIndex(sections);
+  const stemMatches: SectionMatch[] = [];
+  if (isFullPath) {
+    // Expand file stem in the file part of the query
+    const hashIdx = normalized.indexOf('#');
+    const filePart = normalized.slice(0, hashIdx);
+    const rest = normalized.slice(hashIdx);
+    const paths = fileIndex.get(filePart) ?? [];
+    for (const p of paths) {
+      const expanded = (p + rest).toLowerCase();
+      const s = flat.find(
+        (s) => s.id.toLowerCase() === expanded && !exact.includes(s),
+      );
+      if (s)
+        stemMatches.push({
+          section: s,
+          reason: `file stem expanded: ${filePart} → ${p}`,
+        });
+    }
+    if (stemMatches.length > 0) return [...exactMatches, ...stemMatches];
+  } else {
+    // Bare name: match file root sections via stem index
+    const paths = fileIndex.get(normalized) ?? [];
+    for (const p of paths) {
+      const s = flat.find(
+        (s) => s.id.toLowerCase() === p.toLowerCase() && !exact.includes(s),
+      );
+      if (s) stemMatches.push({ section: s, reason: 'file stem match' });
+    }
+  }
 
   // Tier 2: exact match on trailing segments (subsection name match)
-  const subsection = isFullPath
-    ? []
-    : flat.filter((s) =>
-        tailSegments(s.id).some((tail) => tail.toLowerCase() === q),
-      );
-
-  // Tier 3: fuzzy match by edit distance on each segment tail and full id
   const seen = new Set([
     ...exact.map((s) => s.id),
-    ...subsection.map((s) => s.id),
+    ...stemMatches.map((m) => m.section.id),
   ]);
-  const fuzzy: { section: Section; distance: number }[] = [];
+  const subsection: SectionMatch[] = isFullPath
+    ? []
+    : flat
+        .filter((s) => {
+          if (seen.has(s.id)) return false;
+          return tailSegments(s.id).some((tail) => tail.toLowerCase() === q);
+        })
+        .map((s) => ({ section: s, reason: 'section name match' }));
+
+  // Tier 2b: subsequence match — query segments are a subsequence of section id segments
+  // e.g. "Markdown#Resolution Rules" matches "markdown#Wiki Links#Resolution Rules"
+  const seenSub = new Set([...seen, ...subsection.map((m) => m.section.id)]);
+  const qParts = q.split('#');
+  const subsequence: SectionMatch[] =
+    qParts.length >= 2
+      ? flat
+          .filter((s) => {
+            if (seenSub.has(s.id)) return false;
+            const sParts = s.id.toLowerCase().split('#');
+            if (sParts.length <= qParts.length) return false;
+            let qi = 0;
+            for (const sp of sParts) {
+              if (sp === qParts[qi]) qi++;
+              if (qi === qParts.length) return true;
+            }
+            return false;
+          })
+          .map((s) => {
+            const skipped = s.id.split('#').length - qParts.length;
+            return {
+              section: s,
+              reason: `path match, ${skipped} intermediate ${skipped === 1 ? 'section' : 'sections'} skipped`,
+            };
+          })
+      : [];
+
+  // Tier 3: fuzzy match by edit distance on each segment tail and full id
+  const seenAll = new Set([
+    ...seenSub,
+    ...subsequence.map((m) => m.section.id),
+  ]);
+  const fuzzy: { section: Section; distance: number; matched: string }[] = [];
+
+  // For full-path queries, extract the file and heading parts so we can
+  // fuzzy-match only the heading portion when the file part matches exactly.
+  // This prevents the shared file prefix from inflating similarity scores
+  // (e.g. "cli#locat" would otherwise fuzzy-match "cli#prompt").
+  const qHashIdx = normalized.indexOf('#');
+  const qFile =
+    qHashIdx === -1 ? null : normalized.slice(0, qHashIdx).toLowerCase();
+  const qHeading =
+    qHashIdx === -1 ? null : normalized.slice(qHashIdx + 1).toLowerCase();
 
   for (const s of flat) {
-    if (seen.has(s.id)) continue;
+    if (seenAll.has(s.id)) continue;
     const candidates = [s.id, ...tailSegments(s.id)];
     let best = Infinity;
+    let bestCandidate = '';
     for (const c of candidates) {
-      const d = levenshtein(c.toLowerCase(), q);
-      const maxLen = Math.max(c.length, q.length);
-      if (d / maxLen <= MAX_DISTANCE_RATIO && d < best) {
+      let d: number;
+      let maxLen: number;
+      const cl = c.toLowerCase();
+      const cHashIdx = cl.indexOf('#');
+
+      // When both query and candidate have # and their file parts match,
+      // compare only the heading portions to avoid file-prefix inflation
+      if (qFile && qHeading && cHashIdx !== -1) {
+        const cFile = cl.slice(0, cHashIdx);
+        const cHeading = cl.slice(cHashIdx + 1);
+        if (cFile === qFile) {
+          d = levenshtein(cHeading, qHeading);
+          maxLen = Math.max(cHeading.length, qHeading.length);
+        } else {
+          d = levenshtein(cl, q);
+          maxLen = Math.max(c.length, q.length);
+        }
+      } else {
+        d = levenshtein(cl, q);
+        maxLen = Math.max(c.length, q.length);
+      }
+
+      if (maxLen > 0 && d / maxLen <= MAX_DISTANCE_RATIO && d < best) {
         best = d;
+        bestCandidate = c;
       }
     }
     if (best < Infinity) {
-      fuzzy.push({ section: s, distance: best });
+      fuzzy.push({ section: s, distance: best, matched: bestCandidate });
     }
   }
   fuzzy.sort((a, b) => a.distance - b.distance);
 
-  return [...exact, ...subsection, ...fuzzy.map((f) => f.section)];
+  const fuzzyMatches: SectionMatch[] = fuzzy.map((f) => ({
+    section: f.section,
+    reason:
+      f.matched.toLowerCase() === f.section.id.toLowerCase()
+        ? `fuzzy match, distance ${f.distance}`
+        : `fuzzy match on "${f.matched}", distance ${f.distance}`,
+  }));
+
+  // Sort results: shallower depth first, then fewer path segments
+  const sortKey = (s: Section) => {
+    const pathDepth = (s.file.match(/\//g) || []).length;
+    return s.depth * 100 + pathDepth;
+  };
+
+  const sortedStems = [...stemMatches].sort(
+    (a, b) => sortKey(a.section) - sortKey(b.section),
+  );
+
+  return [
+    ...exactMatches,
+    ...sortedStems,
+    ...subsection,
+    ...subsequence,
+    ...fuzzyMatches,
+  ];
 }
 
 export function extractRefs(

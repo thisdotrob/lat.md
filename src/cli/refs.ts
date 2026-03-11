@@ -10,8 +10,9 @@ import {
   buildFileIndex,
   resolveRef,
   type Section,
+  type SectionMatch,
 } from '../lattice.js';
-import { formatSectionPreview, formatSectionId } from '../format.js';
+import { formatResultList } from '../format.js';
 import { scanCodeRefs } from '../code-refs.js';
 import type { CliContext } from './context.js';
 
@@ -46,14 +47,21 @@ export async function refsCmd(
     if (matches.length > 0) {
       console.error(ctx.chalk.dim('\nDid you mean:\n'));
       for (const m of matches) {
-        console.error('  ' + ctx.chalk.white(m.id));
+        console.error(
+          ctx.chalk.dim('*') +
+            ' ' +
+            ctx.chalk.white(m.section.id) +
+            ' ' +
+            ctx.chalk.dim(`(${m.reason})`),
+        );
       }
     }
     process.exit(1);
   }
 
   const targetId = exactMatch.id.toLowerCase();
-  let hasOutput = false;
+  const mdMatches: SectionMatch[] = [];
+  const codeLines: string[] = [];
 
   if (scope === 'md' || scope === 'md+code') {
     const files = await listLatticeFiles(ctx.latDir);
@@ -77,11 +85,8 @@ export async function refsCmd(
       const referrers = flat.filter((s) =>
         matchingFromSections.has(s.id.toLowerCase()),
       );
-
-      for (let i = 0; i < referrers.length; i++) {
-        if (hasOutput) console.log('');
-        console.log(formatSectionPreview(referrers[i], ctx.latDir));
-        hasOutput = true;
+      for (const s of referrers) {
+        mdMatches.push({ section: s, reason: 'wiki link' });
       }
     }
   }
@@ -96,15 +101,32 @@ export async function refsCmd(
         fileIndex,
       );
       if (codeResolved.toLowerCase() === targetId) {
-        if (hasOutput) console.log('');
-        console.log(`  ${ref.file}:${ref.line}`);
-        hasOutput = true;
+        codeLines.push(`${ref.file}:${ref.line}`);
       }
     }
   }
 
-  if (!hasOutput) {
+  if (mdMatches.length === 0 && codeLines.length === 0) {
     console.error(ctx.chalk.red(`No references to "${exactMatch.id}" found`));
     process.exit(1);
+  }
+
+  if (mdMatches.length > 0) {
+    console.log(
+      formatResultList(
+        `References to "${exactMatch.id}":`,
+        mdMatches,
+        ctx.latDir,
+      ),
+    );
+  }
+
+  if (codeLines.length > 0) {
+    if (mdMatches.length > 0) console.log('');
+    console.log(ctx.chalk.bold('Code references:'));
+    console.log('');
+    for (const line of codeLines) {
+      console.log(`${ctx.chalk.dim('*')} ${line}`);
+    }
   }
 }

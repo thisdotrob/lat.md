@@ -5,7 +5,7 @@ import { detectProvider } from '../search/provider.js';
 import { indexSections } from '../search/index.js';
 import { searchSections } from '../search/search.js';
 import { loadAllSections, flattenSections } from '../lattice.js';
-import { formatResultList, formatSectionPreview } from '../format.js';
+import { formatResultList } from '../format.js';
 
 export async function searchCmd(
   ctx: CliContext,
@@ -69,12 +69,11 @@ export async function searchCmd(
 
     const matched = results
       .map((r) => byId.get(r.id))
-      .filter((s): s is NonNullable<typeof s> => !!s);
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .map((s) => ({ section: s, reason: 'semantic match' }));
 
     console.log(
-      formatResultList(`Search results for "${query}":`, matched, ctx.latDir, {
-        numbered: true,
-      }),
+      formatResultList(`Search results for "${query}":`, matched, ctx.latDir),
     );
   } finally {
     await closeDb(db);

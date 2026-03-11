@@ -2,30 +2,26 @@ import { relative } from 'node:path';
 import {
   loadAllSections,
   findSections,
-  flattenSections,
-  buildFileIndex,
-  resolveRef,
   type Section,
+  type SectionMatch,
 } from '../lattice.js';
 import type { CliContext } from './context.js';
 
 const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
 
-function formatContext(section: Section, latDir: string): string {
+function formatLocation(section: Section, latDir: string): string {
   const relPath = relative(process.cwd(), latDir + '/' + section.file + '.md');
-  const loc = `${relPath}:${section.startLine}-${section.endLine}`;
-  let text = `[${section.id}](${loc})`;
-  if (section.body) {
-    text += `: ${section.body}`;
-  }
-  return text;
+  return `${relPath}:${section.startLine}-${section.endLine}`;
 }
+
+type ResolvedRef = {
+  target: string;
+  best: SectionMatch;
+  alternatives: SectionMatch[];
+};
 
 export async function promptCmd(ctx: CliContext, text: string): Promise<void> {
   const allSections = await loadAllSections(ctx.latDir);
-  const flat = flattenSections(allSections);
-  const sectionIds = new Set(flat.map((s) => s.id.toLowerCase()));
-  const fileIndex = buildFileIndex(allSections);
 
   const refs = [...text.matchAll(WIKI_LINK_RE)];
   if (refs.length === 0) {
@@ -33,39 +29,20 @@ export async function promptCmd(ctx: CliContext, text: string): Promise<void> {
     return;
   }
 
-  const resolved = new Map<string, Section>();
+  const resolved = new Map<string, ResolvedRef>();
 
   for (const match of refs) {
     const target = match[1];
     if (resolved.has(target)) continue;
 
-    // Resolve short refs (e.g. search#X → tests/search#X)
-    const { resolved: resolvedTarget } = resolveRef(
-      target,
-      sectionIds,
-      fileIndex,
-    );
-    const q = resolvedTarget.toLowerCase();
-    const exact = flat.find((s) => s.id.toLowerCase() === q);
-    if (exact) {
-      resolved.set(target, exact);
+    const matches = findSections(allSections, target);
+    if (matches.length >= 1) {
+      resolved.set(target, {
+        target,
+        best: matches[0],
+        alternatives: matches.slice(1),
+      });
       continue;
-    }
-
-    const fuzzy = findSections(allSections, target);
-    if (fuzzy.length === 1) {
-      resolved.set(target, fuzzy[0]);
-      continue;
-    }
-
-    if (fuzzy.length > 1) {
-      console.error(ctx.chalk.red(`Ambiguous reference [[${target}]].`));
-      console.error(ctx.chalk.dim('\nCould match:\n'));
-      for (const m of fuzzy) {
-        console.error('  ' + m.id);
-      }
-      console.error(ctx.chalk.dim('\nAsk the user which section they meant.'));
-      process.exit(1);
     }
 
     console.error(
@@ -79,14 +56,30 @@ export async function promptCmd(ctx: CliContext, text: string): Promise<void> {
 
   // Replace [[refs]] inline
   let output = text.replace(WIKI_LINK_RE, (_match, target: string) => {
-    const section = resolved.get(target)!;
-    return `[[${section.id}]]`;
+    const ref = resolved.get(target)!;
+    return `[[${ref.best.section.id}]]`;
   });
 
-  // Append context block
+  // Append context block as nested outliner
   output += '\n\n<lat-context>\n';
-  for (const section of resolved.values()) {
-    output += formatContext(section, ctx.latDir) + '\n';
+  for (const ref of resolved.values()) {
+    const isExact = ref.best.reason === 'exact match';
+    const all = isExact ? [ref.best] : [ref.best, ...ref.alternatives];
+
+    if (isExact) {
+      output += `* \`[[${ref.target}]]\` is referring to:\n`;
+    } else {
+      output += `* \`[[${ref.target}]]\` might be referring to either of the following:\n`;
+    }
+
+    for (const m of all) {
+      const reason = isExact ? '' : ` (${m.reason})`;
+      output += `  * [[${m.section.id}]]${reason}\n`;
+      output += `    * ${formatLocation(m.section, ctx.latDir)}\n`;
+      if (m.section.body) {
+        output += `    * ${m.section.body}\n`;
+      }
+    }
   }
   output += '</lat-context>\n';
 

@@ -4,11 +4,13 @@ The `lat` command line tool. Entry point: `src/cli/index.ts`.
 
 ## locate
 
-Find sections by query. Results are returned in priority order:
+Find sections by query. Strips `[[brackets]]` and leading `#` from the query before searching. Results are returned in priority order:
 
-1. **Exact match** — full section path matches (case-insensitive). If the query contains `#` (a full path), subsection matching is skipped but fuzzy matching still applies as a fallback.
-2. **Subsection match** — the query matches a trailing segment of a section id. e.g. `Frontmatter` matches `markdown#Frontmatter`. Skipped when the query contains `#`.
-3. **Fuzzy match** — sections whose id or trailing segments are within edit distance (Levenshtein, max 40% of string length). e.g. `Frontmattar` matches `markdown#Frontmatter`.
+1. **Exact match** — full section path matches (case-insensitive). If the query contains `#` (a full path) and matches exactly, returns immediately.
+2. **File stem match** — for bare names (no `#`), the query is matched against file stems via `buildFileIndex`. e.g. `locate` matches the root section of `tests/locate.md`. For queries with `#`, the file part is expanded: `setup#Install` → `guides/setup#Install`. Results sorted by depth (shallower first) then path depth.
+3. **Subsection match** — the query matches a trailing segment of a section id. e.g. `Frontmatter` matches `markdown#Frontmatter`. Skipped when the query contains `#`.
+4. **Subsequence match** — query `#`-segments are a subsequence of the section id segments. e.g. `Markdown#Resolution Rules` matches `markdown#Wiki Links#Resolution Rules` (1 intermediate section skipped). Requires at least 2 query segments.
+5. **Fuzzy match** — sections whose id or trailing segments are within edit distance (Levenshtein, max 40% of string length). e.g. `Frontmattar` matches `markdown#Frontmatter`. For queries with `#`, when the file part matches exactly, only the heading portion is compared — prevents the shared file prefix from inflating similarity (e.g. `cli#locat` matches `cli#locate` but not `cli#prompt`).
 
 Outputs a [[cli#Section Preview]] for each match.
 
@@ -65,13 +67,11 @@ Expand `[[refs]]` in a prompt text to resolved `lat.md` section paths with locat
 
 Usage: `lat prompt <text>` or `echo "text" | lat prompt`
 
-For each `[[ref]]` in the input:
-1. **Exact match** — resolves directly
-2. **Single fuzzy/subsection match** — resolves automatically
-3. **Multiple matches** — errors out listing candidates, tells the agent to ask the user to clarify
-4. **No match** — errors out, tells the agent to ask the user to correct the reference
+For each `[[ref]]` in the input, uses `findSections()` directly (no `resolveRef`):
+1. **Best match** — resolves to the top result from `findSections` (exact > file stem > subsection > subsequence > fuzzy)
+2. **No match** — errors out, tells the agent to ask the user to correct the reference
 
-Output replaces `[[ref]]` with `[[resolved-id]]` inline and appends a `<lat-context>` block with section locations and body text.
+Output replaces `[[ref]]` with `[[resolved-id]]` inline and appends a `<lat-context>` block as a nested outliner. For exact matches: `is referring to:`. For non-exact: `might be referring to either of the following:` with all candidates, match reasons, locations, and body text.
 
 Implementation: `src/cli/prompt.ts`
 
@@ -159,12 +159,14 @@ Implementation: `src/search/search.ts`
 
 ## Section Preview
 
-Shared output format used by [[cli#locate]], [[cli#refs]], and [[cli#search]]. Each section is rendered as:
+Shared output format used by [[cli#locate]], [[cli#refs]], and [[cli#search]]. Each section is rendered as a bullet (`*`) with:
 
-1. Section id (path segments dimmed, final segment bold)
-2. "Defined in" label with file path (cyan) and line range
-3. Body text quoted with `>` (first paragraph, truncated at 200 chars)
+1. Kind label (`File:` or `Section:`) — file root sections vs subsections
+2. Section id in `[[wiki link]]` syntax (path segments dimmed, final segment bold)
+3. Match reason in parentheses (e.g. `(exact match)`, `(section name match)`, `(fuzzy match, distance 2)`)
+4. "Defined in" label with file path (cyan) and line range
+5. Body text quoted with `>` (first paragraph, truncated at 200 chars)
 
-Commands that return multiple results use `formatResultList()` which adds a bold header, numbered items, and consistent spacing.
+Commands that return multiple results use `formatResultList()` which adds a bold header and consistent spacing.
 
 Implementation: `src/format.ts` — exports `formatSectionId`, `formatSectionPreview`, and `formatResultList`

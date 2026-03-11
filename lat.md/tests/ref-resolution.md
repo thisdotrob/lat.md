@@ -58,3 +58,39 @@ A `@lat:` code comment using the full vault-relative path `[[guides/setup#Config
 ## Full ref refs finds code references
 
 `lat refs` for a full ref target finds `@lat:` code references that use the full path form.
+
+## Bare heading in md is error
+
+A wiki link `[[Installation]]` where `Installation` is a heading (not a file) is flagged as a broken link by `check md`. Bare names resolve as file references in Obsidian convention — since no file `Installation.md` exists, it's an error.
+
+## Local section syntax in md is error
+
+A wiki link `[[#Configuration]]` using Obsidian local-section syntax is flagged as a broken link by `check md`. The `#`-prefixed form is not supported — use the full `[[file#Heading]]` form instead.
+
+## Nonexistent file ref in md is error
+
+A wiki link `[[other-file#Missing]]` where `other-file.md` does not exist is flagged as a broken link by `check md`.
+
+## Bare heading in code is error
+
+A `@lat:` code comment `// @lat: [[Installation]]` where `Installation` is a heading (not a file) is flagged as a dangling ref by `check code-refs`. Code refs must use `[[file#Heading]]` form.
+
+## Valid code ref with file prefix passes
+
+A `@lat:` code comment `// @lat: [[docs#Configuration]]` using the correct `file#Heading` form passes `check code-refs` without errors.
+
+## Nested in-file refs pass
+
+Wiki links using the full heading chain within the same file (e.g. `[[guide#Setup#Prerequisites]]`, `[[guide#Usage#Basic]]`) pass `check md` without errors.
+
+## Skipped intermediate in ref is error
+
+A wiki link `[[guide#Prerequisites]]` that skips the intermediate `Setup` section is flagged as a broken link by `check md`. The full path `[[guide#Setup#Prerequisites]]` is required.
+
+## Wrong nesting order in ref is error
+
+A wiki link `[[guide#Install#Setup]]` with headings in the wrong order is flagged as a broken link by `check md`.
+
+## Nonexistent leaf in nested ref is error
+
+A wiki link `[[guide#Setup#Missing]]` where the leaf heading does not exist is flagged as a broken link by `check md`.
