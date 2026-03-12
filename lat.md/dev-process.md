@@ -48,8 +48,9 @@ How to publish a new version:
 1. **Compile changelog** — run `git log --oneline` since the last version bump commit (look for commits matching `Bump to X.Y.Z`) and summarize notable changes as bullet points
 2. **Create a release branch** — branch off `main`, e.g. `release/0.1.5`
 3. **Bump version** — update `version` in `package.json`. Commit message: `Bump to X.Y.Z`
-4. **Push and open a PR** — push the branch and create a PR with the changelog as the body
-5. **Merge** — once CI passes and the PR is merged to `main`, the [[dev-process#Publishing#Publish Workflow]] takes over
+4. **Switch back to main** — check out `main` so the working tree is not left on the release branch
+5. **Push and open a PR** — push the release branch and create a PR with the changelog as the body
+6. **Merge** — once CI passes and the PR is merged to `main`, the [[dev-process#Publishing#Publish Workflow]] takes over
 
 Version numbers follow semver. While pre-1.0, bump the patch for fixes and the minor for features/breaking changes.
 
