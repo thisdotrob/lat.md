@@ -244,7 +244,7 @@ describe('prompt', () => {
     return execSync(`node ${join(import.meta.dirname, '..', 'dist', 'src', 'cli', 'index.js')} prompt ${JSON.stringify(text)}`, {
       cwd: root,
       encoding: 'utf-8',
-      env: { ...process.env, _LAT_TEST_DISABLE_FS_CACHE: '1' },
+      env: process.env,
     });
   }
 

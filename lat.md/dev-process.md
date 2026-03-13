@@ -27,7 +27,7 @@ Every test run includes a full `tsc --noEmit` pass over the entire codebase. If 
 
 ## File Walking
 
-All directory walking goes through `walkEntries()` in `src/walk.ts` — the single entry point that wraps the `ignore-walk` npm package with `.gitignore` support and filters out `.git/` and dotfiles. This ensures `.gitignore` rules are consistently honored everywhere.
+All directory walking goes through `walkEntries()` in `src/walk.ts` — the single entry point that wraps the `ignore-walk` npm package with `.gitignore` support and filters out `.git/` and dotfiles. This ensures `.gitignore` rules are consistently honored everywhere. Results are not cached — each call re-walks the filesystem, which is necessary for long-lived processes like the MCP server.
 
 `walkFiles()` in `src/code-refs.ts` calls `walkEntries()` then additionally skips `.md` files, `lat.md/`, `.claude/`, and sub-projects (directories containing their own `lat.md/`).
 

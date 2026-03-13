@@ -170,28 +170,14 @@ export function parseSections(
   return roots;
 }
 
-const sectionsCache = new Map<string, Promise<Section[]>>();
-
-export function loadAllSections(latticeDir: string): Promise<Section[]> {
-  const noCache = !!process.env._LAT_TEST_DISABLE_FS_CACHE;
-  const key = resolve(latticeDir);
-  if (!noCache) {
-    const cached = sectionsCache.get(key);
-    if (cached) return cached;
+export async function loadAllSections(latticeDir: string): Promise<Section[]> {
+  const files = await listLatticeFiles(latticeDir);
+  const all: Section[] = [];
+  for (const file of files) {
+    const content = await readFile(file, 'utf-8');
+    all.push(...parseSections(file, content, latticeDir));
   }
-  const result = (async () => {
-    const files = await listLatticeFiles(latticeDir);
-    const all: Section[] = [];
-    for (const file of files) {
-      const content = await readFile(file, 'utf-8');
-      all.push(...parseSections(file, content, latticeDir));
-    }
-    return all;
-  })();
-  if (!noCache) {
-    sectionsCache.set(key, result);
-  }
-  return result;
+  return all;
 }
 
 export function flattenSections(sections: Section[]): Section[] {

@@ -59,9 +59,6 @@ describe.skipIf(!canRun)('search (rag)', () => {
   let flushCapture: () => void;
 
   beforeAll(async () => {
-    // These tests mutate the fixture (delete files), so disable FS caching
-    process.env._LAT_TEST_DISABLE_FS_CACHE = '1';
-
     if (capturing) {
       // Capture mode: proxy to real API, record vectors
       const realKey = process.env.LAT_LLM_KEY;
@@ -98,7 +95,6 @@ describe.skipIf(!canRun)('search (rag)', () => {
   });
 
   afterAll(async () => {
-    delete process.env._LAT_TEST_DISABLE_FS_CACHE;
     if (capturing) flushCapture();
     if (db) await closeDb(db);
     if (server) server.close();
