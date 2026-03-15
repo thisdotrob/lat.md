@@ -2,7 +2,7 @@
 
 The `lat` command line tool. Entry point: [[src/cli/index.ts]].
 
-**Design principle: shared core, thin wrappers.** Every CLI command and its corresponding [[cli#mcp]] tool must share the same core function. The core function (e.g. `getSection`, `findRefs`, `runSearch`) lives in `src/cli/` and returns structured data. CLI commands are thin wrappers that add chalk coloring and `process.exit`. MCP tools are thin wrappers that format plain text. Never duplicate business logic between CLI and MCP.
+**Design principle: shared core, thin wrappers.** Every CLI command and its corresponding [[cli#mcp]] tool share the same command function (e.g. `locateCommand`, `sectionCommand`, `refsCommand`). Each command function accepts a `CmdContext` (with a `Styler` abstraction for chalk vs plain formatting) and returns a `CmdResult` (`{ output, isError? }`). CLI and MCP are thin wrappers that construct the appropriate context and handle the result — CLI calls `handleResult` (print + exit code), MCP calls `toMcp` (wrap in MCP response). Some commands have a separate business-logic layer (e.g. `getSection`, `findRefs`, `runSearch`) that returns structured data, called by the command function. Shared types live in [[src/context.ts]]. Never duplicate business logic between CLI and MCP.
 
 ## locate
 
@@ -195,7 +195,7 @@ Clients invoke this as `lat mcp`. The `lat init` wizard registers the MCP server
 - **lat_check** — validate links and code refs (wraps [[cli#check]])
 - **lat_refs** — find references to a section (wraps [[cli#refs]])
 
-Each MCP tool delegates to the same core function as the CLI command (e.g. [[src/cli/refs.ts#findRefs]], [[src/cli/search.ts#runSearch]], [[src/cli/prompt.ts#expandPrompt]]) — no duplicated logic. Uses `@modelcontextprotocol/sdk` with stdio transport. Resolves `lat.md/` from cwd. Returns plain text (no color).
+Each MCP tool calls the same command function as the CLI (e.g. `locateCommand`, `refsCommand`, `searchCommand`), passing a `CmdContext` with `plainStyler` and `mode: 'mcp'`. The `toMcp()` helper converts `CmdResult` to MCP response format. Uses `@modelcontextprotocol/sdk` with stdio transport. Resolves `lat.md/` from cwd.
 
 Implementation: [[src/mcp/server.ts]]
 

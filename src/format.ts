@@ -1,27 +1,31 @@
 import { join, relative } from 'node:path';
-import chalk from 'chalk';
 import type { Section, SectionMatch } from './lattice.js';
+import type { CmdContext, Styler } from './context.js';
 
-export function formatSectionId(id: string): string {
+export function formatSectionId(id: string, s: Styler): string {
   const parts = id.split('#');
   return parts.length === 1
-    ? chalk.bold.white(parts[0])
-    : chalk.dim(parts.slice(0, -1).join('#') + '#') +
-        chalk.bold.white(parts[parts.length - 1]);
+    ? s.boldWhite(parts[0])
+    : s.dim(parts.slice(0, -1).join('#') + '#') +
+        s.boldWhite(parts[parts.length - 1]);
 }
 
 export function formatSectionPreview(
+  ctx: CmdContext,
   section: Section,
-  projectRoot: string,
   opts?: { reason?: string },
 ): string {
-  const relPath = relative(process.cwd(), join(projectRoot, section.filePath));
+  const s = ctx.styler;
+  const relPath = relative(
+    process.cwd(),
+    join(ctx.projectRoot, section.filePath),
+  );
 
   const kind = section.id.includes('#') ? 'Section' : 'File';
-  const reasonSuffix = opts?.reason ? ' ' + chalk.dim(`(${opts.reason})`) : '';
+  const reasonSuffix = opts?.reason ? ' ' + s.dim(`(${opts.reason})`) : '';
   const lines: string[] = [
-    `${chalk.dim('*')} ${chalk.dim(kind + ':')} [[${formatSectionId(section.id)}]]${reasonSuffix}`,
-    `  ${chalk.dim('Defined in')} ${chalk.cyan(relPath)}${chalk.dim(`:${section.startLine}-${section.endLine}`)}`,
+    `${s.dim('*')} ${s.dim(kind + ':')} [[${formatSectionId(section.id, s)}]]${reasonSuffix}`,
+    `  ${s.dim('Defined in')} ${s.cyan(relPath)}${s.dim(`:${section.startLine}-${section.endLine}`)}`,
   ];
 
   if (section.body) {
@@ -29,24 +33,23 @@ export function formatSectionPreview(
       section.body.length > 200
         ? section.body.slice(0, 200) + '...'
         : section.body;
-    lines.push('');
-    lines.push(`  ${chalk.dim('>')} ${truncated}`);
+    lines.push('', `  ${s.dim('>')} ${truncated}`);
   }
 
   return lines.join('\n');
 }
 
 export function formatResultList(
+  ctx: CmdContext,
   header: string,
   matches: SectionMatch[],
-  projectRoot: string,
 ): string {
-  const lines: string[] = ['', chalk.bold(header), ''];
+  const lines: string[] = ['', ctx.styler.bold(header), ''];
 
   for (let i = 0; i < matches.length; i++) {
     if (i > 0) lines.push('');
     lines.push(
-      formatSectionPreview(matches[i].section, projectRoot, {
+      formatSectionPreview(ctx, matches[i].section, {
         reason: matches[i].reason,
       }),
     );

@@ -11,7 +11,8 @@ import {
   type Section,
   type SectionMatch,
 } from '../lattice.js';
-import type { CliContext } from './context.js';
+import type { CmdContext, CmdResult } from '../context.js';
+import { formatSectionId } from '../format.js';
 
 export type SectionFound = {
   kind: 'found';
@@ -30,13 +31,12 @@ export type SectionResult =
  * and incoming references from other sections.
  */
 export async function getSection(
-  latDir: string,
-  projectRoot: string,
+  ctx: CmdContext,
   query: string,
 ): Promise<SectionResult> {
   query = query.replace(/^\[\[|\]\]$/g, '');
 
-  const allSections = await loadAllSections(latDir);
+  const allSections = await loadAllSections(ctx.latDir);
   const matches = findSections(allSections, query);
 
   if (matches.length === 0) {
@@ -57,7 +57,7 @@ export async function getSection(
   const section = top.section;
 
   // Read raw content between startLine and endLine
-  const absPath = join(projectRoot, section.filePath);
+  const absPath = join(ctx.projectRoot, section.filePath);
   const fileContent = await readFile(absPath, 'utf-8');
   const lines = fileContent.split('\n');
   const content = lines
@@ -68,7 +68,7 @@ export async function getSection(
   const flat = flattenSections(allSections);
   const sectionIds = new Set(flat.map((s) => s.id.toLowerCase()));
   const fileIndex = buildFileIndex(allSections);
-  const sectionRefs = extractRefs(absPath, fileContent, projectRoot);
+  const sectionRefs = extractRefs(absPath, fileContent, ctx.projectRoot);
   const sectionId = section.id.toLowerCase();
 
   const outgoingRefs: { target: string; resolved: Section }[] = [];
@@ -89,12 +89,12 @@ export async function getSection(
 
   // Find incoming references: other sections that link to this one
   const incomingRefs: SectionMatch[] = [];
-  const files = await listLatticeFiles(latDir);
+  const files = await listLatticeFiles(ctx.latDir);
   const incomingSections = new Set<string>();
 
   for (const file of files) {
     const fc = await readFile(file, 'utf-8');
-    const fileRefs = extractRefs(file, fc, projectRoot);
+    const fileRefs = extractRefs(file, fc, ctx.projectRoot);
     for (const ref of fileRefs) {
       const { resolved } = resolveRef(ref.target, sectionIds, fileIndex);
       if (
@@ -122,66 +122,81 @@ function truncate(s: string, max: number): string {
 }
 
 /**
- * Format a successful section result as plain text (markdown).
- * Shared by CLI and MCP — CLI adds chalk on top.
+ * Format a successful section result with styling.
  */
 export function formatSectionOutput(
+  ctx: CmdContext,
   result: SectionFound,
-  projectRoot: string,
 ): string {
+  const s = ctx.styler;
   const { section, content, outgoingRefs, incomingRefs } = result;
-  const relPath = relative(process.cwd(), join(projectRoot, section.filePath));
-  const loc = `${relPath}:${section.startLine}-${section.endLine}`;
+  const relPath = relative(
+    process.cwd(),
+    join(ctx.projectRoot, section.filePath),
+  );
+  const loc = `${s.cyan(relPath)}${s.dim(`:${section.startLine}-${section.endLine}`)}`;
 
-  const parts: string[] = [`**[[${section.id}]]** (${loc})`, '', content];
+  const parts: string[] = [
+    `${s.bold('[[' + formatSectionId(section.id, s) + ']]')} (${loc})`,
+    '',
+    content,
+  ];
 
   if (outgoingRefs.length > 0) {
-    parts.push('', '**This section references:**', '');
+    parts.push('', s.bold('This section references:'), '');
     for (const ref of outgoingRefs) {
       const body = ref.resolved.body
-        ? ` — ${truncate(ref.resolved.body, 120)}`
+        ? ` ${s.dim('—')} ${truncate(ref.resolved.body, 120)}`
         : '';
-      parts.push(`* [[${ref.resolved.id}]]${body}`);
+      parts.push(
+        `${s.dim('*')} [[${formatSectionId(ref.resolved.id, s)}]]${body}`,
+      );
     }
   }
 
   if (incomingRefs.length > 0) {
-    parts.push('', '**Referenced by:**', '');
+    parts.push('', s.bold('Referenced by:'), '');
     for (const ref of incomingRefs) {
       const body = ref.section.body
-        ? ` — ${truncate(ref.section.body, 120)}`
+        ? ` ${s.dim('—')} ${truncate(ref.section.body, 120)}`
         : '';
-      parts.push(`* [[${ref.section.id}]]${body}`);
+      parts.push(
+        `${s.dim('*')} [[${formatSectionId(ref.section.id, s)}]]${body}`,
+      );
     }
   }
 
   return parts.join('\n');
 }
 
-export async function sectionCmd(
-  ctx: CliContext,
+export async function sectionCommand(
+  ctx: CmdContext,
   query: string,
-): Promise<void> {
-  const result = await getSection(ctx.latDir, ctx.projectRoot, query);
+): Promise<CmdResult> {
+  const result = await getSection(ctx, query);
 
   if (result.kind === 'no-match') {
+    const s = ctx.styler;
     if (result.suggestions.length > 0) {
-      console.error(ctx.chalk.red(`No section "${query}" found.`));
-      console.error(ctx.chalk.dim('\nDid you mean:\n'));
-      for (const m of result.suggestions) {
-        console.error(
-          ctx.chalk.dim('*') +
-            ' ' +
-            ctx.chalk.white(m.section.id) +
-            ' ' +
-            ctx.chalk.dim(`(${m.reason})`),
-        );
-      }
-    } else {
-      console.error(ctx.chalk.red(`No sections matching "${query}"`));
+      const suggestions = result.suggestions
+        .map(
+          (m) =>
+            `  ${s.dim('*')} ${s.white(m.section.id)} ${s.dim(`(${m.reason})`)}`,
+        )
+        .join('\n');
+      return {
+        output:
+          s.red(`No section "${query}" found.`) +
+          ' Did you mean:\n' +
+          suggestions,
+        isError: true,
+      };
     }
-    process.exit(1);
+    return {
+      output: s.red(`No sections matching "${query}"`),
+      isError: true,
+    };
   }
 
-  console.log(formatSectionOutput(result, ctx.projectRoot));
+  return { output: formatSectionOutput(ctx, result) };
 }

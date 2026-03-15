@@ -1,26 +1,26 @@
 import { loadAllSections, findSections } from '../lattice.js';
 import { formatResultList } from '../format.js';
-import type { CliContext } from './context.js';
+import type { CmdContext, CmdResult } from '../context.js';
 
-export async function locateCmd(ctx: CliContext, query: string): Promise<void> {
+export async function locateCommand(
+  ctx: CmdContext,
+  query: string,
+): Promise<CmdResult> {
   const stripped = query.replace(/^\[\[|\]\]$/g, '');
   const sections = await loadAllSections(ctx.latDir);
   const matches = findSections(sections, stripped);
 
   if (matches.length === 0) {
-    console.error(
-      ctx.chalk.red(
+    const s = ctx.styler;
+    return {
+      output: s.red(
         `No sections matching "${stripped}" (no exact, substring, or fuzzy matches)`,
       ),
-    );
-    process.exit(1);
+      isError: true,
+    };
   }
 
-  console.log(
-    formatResultList(
-      `Sections matching "${stripped}":`,
-      matches,
-      ctx.projectRoot,
-    ),
-  );
+  return {
+    output: formatResultList(ctx, `Sections matching "${stripped}":`, matches),
+  };
 }

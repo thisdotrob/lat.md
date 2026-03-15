@@ -1,5 +1,4 @@
-import chalk from 'chalk';
-import type { CliContext } from './context.js';
+import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { openDb, ensureSchema, closeDb } from '../search/db.js';
 import { detectProvider } from '../search/provider.js';
 import { indexSections, type IndexStats } from '../search/index.js';
@@ -10,7 +9,6 @@ import {
   type SectionMatch,
 } from '../lattice.js';
 import { formatResultList } from '../format.js';
-import { getLlmKey, getConfigPath } from '../config.js';
 
 export type SearchResult = {
   query: string;
@@ -93,82 +91,82 @@ export async function runIndex(
   await withDb(latDir, key, progress, async () => {});
 }
 
-function resolveKey(): string {
+export function cliProgress(reindex: boolean, s: Styler): IndexProgress {
+  return {
+    beforeIndex(isEmpty) {
+      if (isEmpty || reindex) {
+        const label = reindex ? 'Re-indexing' : 'Building index';
+        process.stderr.write(s.dim(`${label}...`));
+      }
+    },
+    afterIndex(stats, isEmpty) {
+      if (isEmpty || reindex) {
+        process.stderr.write(
+          s.dim(
+            ` done (${stats.added} added, ${stats.updated} updated, ${stats.removed} removed)\n`,
+          ),
+        );
+      } else if (stats.added + stats.updated + stats.removed > 0) {
+        process.stderr.write(
+          s.dim(
+            `Index updated: ${stats.added} added, ${stats.updated} updated, ${stats.removed} removed\n`,
+          ),
+        );
+      }
+    },
+  };
+}
+
+export async function searchCommand(
+  ctx: CmdContext,
+  query: string | undefined,
+  opts: { limit: number; reindex?: boolean },
+  progress?: IndexProgress,
+): Promise<CmdResult> {
+  const { getLlmKey, getConfigPath } = await import('../config.js');
   let key: string | undefined;
   try {
     key = getLlmKey();
   } catch (err) {
-    console.error(chalk.red((err as Error).message));
-    process.exit(1);
+    return { output: (err as Error).message, isError: true };
   }
   if (!key) {
-    console.error(
-      chalk.red('No API key configured.') +
+    const s = ctx.styler;
+    return {
+      output:
+        s.red('No API key configured.') +
         ' Provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        chalk.cyan('lat init') +
-        ' to save one in ' +
-        chalk.dim(getConfigPath()) +
+        s.cyan('lat init') +
+        (ctx.mode === 'cli'
+          ? ' to save one in ' + s.dim(getConfigPath())
+          : '') +
         '.',
-    );
-    process.exit(1);
+      isError: true,
+    };
   }
-  return key;
-}
-
-const cliProgress = (reindex: boolean): IndexProgress => ({
-  beforeIndex(isEmpty) {
-    if (isEmpty || reindex) {
-      const label = reindex ? 'Re-indexing' : 'Building index';
-      process.stderr.write(chalk.dim(`${label}...`));
-    }
-  },
-  afterIndex(stats, isEmpty) {
-    if (isEmpty || reindex) {
-      process.stderr.write(
-        chalk.dim(
-          ` done (${stats.added} added, ${stats.updated} updated, ${stats.removed} removed)\n`,
-        ),
-      );
-    } else if (stats.added + stats.updated + stats.removed > 0) {
-      process.stderr.write(
-        chalk.dim(
-          `Index updated: ${stats.added} added, ${stats.updated} updated, ${stats.removed} removed\n`,
-        ),
-      );
-    }
-  },
-});
-
-export async function searchCmd(
-  ctx: CliContext,
-  query: string | undefined,
-  opts: { limit: number; reindex?: boolean },
-): Promise<void> {
-  const key = resolveKey();
-  const progress = cliProgress(!!opts.reindex);
 
   if (!query) {
     await runIndex(ctx.latDir, key, progress);
-    return;
+    return { output: '' };
   }
 
   const result = await runSearch(ctx.latDir, query, key, opts.limit, progress);
 
   if (result.matches.length === 0) {
-    console.log(chalk.dim('No results found.'));
-    return;
+    return { output: 'No results found.' };
   }
 
-  console.log(
-    formatResultList(
-      `Search results for "${query}":`,
-      result.matches,
-      ctx.projectRoot,
-    ),
-  );
-  console.log(
-    '\nTo navigate further:\n' +
-      '- `lat section "section#id"` — show full content with outgoing/incoming refs\n' +
-      '- `lat search "new query"` — search for something else',
-  );
+  const navHints =
+    ctx.mode === 'cli'
+      ? '- `lat section "section#id"` \u2014 show full content with outgoing/incoming refs\n' +
+        '- `lat search "new query"` \u2014 search for something else'
+      : '- `lat_section` \u2014 show full content with outgoing/incoming refs\n' +
+        '- `lat_search` \u2014 search for something else';
+
+  return {
+    output:
+      formatResultList(ctx, `Search results for "${query}":`, result.matches) +
+      '\nTo navigate further:\n' +
+      navHints,
+  };
 }

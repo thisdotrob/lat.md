@@ -98,7 +98,7 @@ describe('mcp', () => {
     const text = (result.content as { type: string; text: string }[])[0].text;
     expect(text).toContain('lat.md/notes#Notes#Second Topic');
     expect(text).toContain('See [[dev-process#Testing]]');
-    expect(text).toContain('**This section references:**');
+    expect(text).toContain('This section references:');
     expect(text).toContain('lat.md/dev-process#Dev Process#Testing');
   });
 
@@ -198,7 +198,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
       arguments: { query: 'anything' },
     });
     const text = (result.content as { type: string; text: string }[])[0].text;
-    expect(text).toContain('No LLM key found');
+    expect(text).toContain('No API key configured');
     expect(result.isError).toBe(true);
 
     await client2.close();

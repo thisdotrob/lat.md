@@ -14,7 +14,7 @@ import {
 } from '../lattice.js';
 import { scanCodeRefs } from '../code-refs.js';
 import { walkEntries } from '../walk.js';
-import type { CliContext } from './context.js';
+import type { CmdContext, CmdResult, Styler } from '../context.js';
 
 export type CheckError = {
   file: string;
@@ -380,80 +380,50 @@ export async function checkIndex(latticeDir: string): Promise<IndexError[]> {
   return errors;
 }
 
-function formatErrors(
-  ctx: CliContext,
-  errors: CheckError[],
-  startIdx = 0,
-): void {
-  for (let i = 0; i < errors.length; i++) {
-    const err = errors[i];
-    if (i > 0 || startIdx > 0) console.error('');
-    const loc = ctx.chalk.cyan(err.file + ':' + err.line);
+// --- Formatting helpers (shared by all check commands) ---
+
+function formatFileStats(files: FileStats, s: Styler): string {
+  const entries = Object.entries(files).sort(([a], [b]) => a.localeCompare(b));
+  return s.dim(
+    `Scanned ${entries.map(([ext, n]) => `${n} ${ext}`).join(', ')}`,
+  );
+}
+
+function formatCheckErrors(errors: CheckError[], s: Styler): string[] {
+  const lines: string[] = [];
+  for (const err of errors) {
+    lines.push('');
+    const loc = s.cyan(err.file + ':' + err.line);
     const [first, ...rest] = err.message.split('\n');
-    console.error(`- ${loc}: ${ctx.chalk.red(first)}`);
+    lines.push(`- ${loc}: ${s.red(first)}`);
     for (const line of rest) {
-      console.error(`  ${ctx.chalk.red(line)}`);
+      lines.push(`  ${s.red(line)}`);
     }
   }
+  return lines;
 }
 
-function formatIndexErrors(
-  ctx: CliContext,
-  errors: IndexError[],
-  startIdx = 0,
-): void {
-  for (let i = 0; i < errors.length; i++) {
-    if (i > 0 || startIdx > 0) console.error('');
-    const loc = ctx.chalk.cyan(errors[i].dir);
-    const [first, ...rest] = errors[i].message.split('\n');
-    console.error(`- ${loc}: ${ctx.chalk.red(first)}`);
+function formatCheckIndexErrors(errors: IndexError[], s: Styler): string[] {
+  const lines: string[] = [];
+  for (const err of errors) {
+    lines.push('');
+    const loc = s.cyan(err.dir);
+    const [first, ...rest] = err.message.split('\n');
+    lines.push(`- ${loc}: ${s.red(first)}`);
     for (const line of rest) {
-      console.error(`  ${ctx.chalk.red(line)}`);
+      lines.push(`  ${s.red(line)}`);
     }
   }
+  return lines;
 }
 
-function formatErrorCount(ctx: CliContext, count: number): void {
-  if (count > 0) {
-    console.error(
-      ctx.chalk.red(`\n${count} error${count === 1 ? '' : 's'} found`),
-    );
-  }
+function formatErrorCount(count: number, s: Styler): string {
+  return s.red(`\n${count} error${count === 1 ? '' : 's'} found`);
 }
 
-function formatStats(ctx: CliContext, stats: FileStats): void {
-  const entries = Object.entries(stats).sort(([a], [b]) => a.localeCompare(b));
-  const parts = entries.map(([ext, n]) => `${n} ${ext}`);
-  console.log(ctx.chalk.dim(`Scanned ${parts.join(', ')}`));
-}
+// --- Unified command functions ---
 
-export async function checkMdCmd(ctx: CliContext): Promise<void> {
-  const { errors, files } = await checkMd(ctx.latDir);
-  formatStats(ctx, files);
-  formatErrors(ctx, errors);
-  formatErrorCount(ctx, errors.length);
-  if (errors.length > 0) process.exit(1);
-  console.log(ctx.chalk.green('md: All links OK'));
-}
-
-export async function checkCodeRefsCmd(ctx: CliContext): Promise<void> {
-  const { errors, files } = await checkCodeRefs(ctx.latDir);
-  formatStats(ctx, files);
-  formatErrors(ctx, errors);
-  formatErrorCount(ctx, errors.length);
-  if (errors.length > 0) process.exit(1);
-  console.log(ctx.chalk.green('code-refs: All references OK'));
-}
-
-export async function checkIndexCmd(ctx: CliContext): Promise<void> {
-  const errors = await checkIndex(ctx.latDir);
-  formatIndexErrors(ctx, errors);
-  formatErrorCount(ctx, errors.length);
-  if (errors.length > 0) process.exit(1);
-  console.log(ctx.chalk.green('index: All directory index files OK'));
-}
-
-export async function checkAllCmd(ctx: CliContext): Promise<void> {
+export async function checkAllCommand(ctx: CmdContext): Promise<CmdResult> {
   const md = await checkMd(ctx.latDir);
   const code = await checkCodeRefs(ctx.latDir);
   const indexErrors = await checkIndex(ctx.latDir);
@@ -464,14 +434,19 @@ export async function checkAllCmd(ctx: CliContext): Promise<void> {
     allFiles[ext] = (allFiles[ext] || 0) + n;
   }
 
-  formatStats(ctx, allFiles);
-  formatErrors(ctx, allErrors);
-  formatIndexErrors(ctx, indexErrors, allErrors.length);
+  const s = ctx.styler;
+  const lines: string[] = [formatFileStats(allFiles, s)];
+
+  lines.push(...formatCheckErrors(allErrors, s));
+  lines.push(...formatCheckIndexErrors(indexErrors, s));
 
   const totalErrors = allErrors.length + indexErrors.length;
-  formatErrorCount(ctx, totalErrors);
-  if (totalErrors > 0) process.exit(1);
-  console.log(ctx.chalk.green('All checks passed'));
+  if (totalErrors > 0) {
+    lines.push(formatErrorCount(totalErrors, s));
+    return { output: lines.join('\n'), isError: true };
+  }
+
+  lines.push(s.green('All checks passed'));
 
   const { getLlmKey } = await import('../config.js');
   let hasKey = false;
@@ -481,12 +456,64 @@ export async function checkAllCmd(ctx: CliContext): Promise<void> {
     // key resolution failed (e.g. empty file) — treat as missing
   }
   if (!hasKey) {
-    console.log(
-      ctx.chalk.yellow('Warning:') +
+    lines.push(
+      s.yellow('Warning:') +
         ' No LLM key found — semantic search (lat search) will not work.' +
         ' Provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        ctx.chalk.cyan('lat init') +
+        s.cyan('lat init') +
         ' to configure.',
     );
   }
+
+  return { output: lines.join('\n') };
+}
+
+export async function checkMdCommand(ctx: CmdContext): Promise<CmdResult> {
+  const { errors, files } = await checkMd(ctx.latDir);
+  const s = ctx.styler;
+  const lines: string[] = [formatFileStats(files, s)];
+
+  lines.push(...formatCheckErrors(errors, s));
+
+  if (errors.length > 0) {
+    lines.push(formatErrorCount(errors.length, s));
+    return { output: lines.join('\n'), isError: true };
+  }
+
+  lines.push(s.green('md: All links OK'));
+  return { output: lines.join('\n') };
+}
+
+export async function checkCodeRefsCommand(
+  ctx: CmdContext,
+): Promise<CmdResult> {
+  const { errors, files } = await checkCodeRefs(ctx.latDir);
+  const s = ctx.styler;
+  const lines: string[] = [formatFileStats(files, s)];
+
+  lines.push(...formatCheckErrors(errors, s));
+
+  if (errors.length > 0) {
+    lines.push(formatErrorCount(errors.length, s));
+    return { output: lines.join('\n'), isError: true };
+  }
+
+  lines.push(s.green('code-refs: All references OK'));
+  return { output: lines.join('\n') };
+}
+
+export async function checkIndexCommand(ctx: CmdContext): Promise<CmdResult> {
+  const errors = await checkIndex(ctx.latDir);
+  const s = ctx.styler;
+  const lines: string[] = [];
+
+  lines.push(...formatCheckIndexErrors(errors, s));
+
+  if (errors.length > 0) {
+    lines.push(formatErrorCount(errors.length, s));
+    return { output: lines.join('\n'), isError: true };
+  }
+
+  lines.push(s.green('index: All directory index files OK'));
+  return { output: lines.join('\n') };
 }

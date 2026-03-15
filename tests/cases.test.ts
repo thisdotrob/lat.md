@@ -13,6 +13,7 @@ import {
   resolveRef,
 } from '../src/lattice.js';
 import { formatSectionPreview } from '../src/format.js';
+import { plainStyler, type CmdContext } from '../src/context.js';
 import { checkMd, checkCodeRefs, checkIndex } from '../src/cli/check.js';
 import { scanCodeRefs } from '../src/code-refs.js';
 import { findRefs } from '../src/cli/refs.js';
@@ -29,6 +30,15 @@ function caseDir(name: string): string {
 
 function latDir(name: string): string {
   return join(casesDir, name, 'lat.md');
+}
+
+function testCtx(name: string): CmdContext {
+  return {
+    latDir: latDir(name),
+    projectRoot: caseDir(name),
+    styler: plainStyler,
+    mode: 'cli',
+  };
 }
 
 // --- basic-project ---
@@ -123,7 +133,7 @@ describe('basic-project', () => {
     )!;
 
     const output = stripAnsi(
-      formatSectionPreview(running, caseDir('basic-project')),
+      formatSectionPreview(testCtx('basic-project'), running),
     );
     const lines = output.split('\n');
     expect(lines[0]).toBe(
@@ -143,7 +153,7 @@ describe('basic-project', () => {
     )!;
 
     const output = stripAnsi(
-      formatSectionPreview(testing, caseDir('basic-project')),
+      formatSectionPreview(testCtx('basic-project'), testing),
     );
     const lines = output.split('\n');
     expect(lines[0]).toBe(
@@ -554,8 +564,7 @@ describe('short-ref', () => {
 
   // @lat: [[ref-resolution#Short ref refs finds md references]]
   it('findRefs with short query finds md wiki links', async () => {
-    const projectRoot = caseDir('short-ref');
-    const result = await findRefs(lat, projectRoot, 'setup#Install', 'md');
+    const result = await findRefs(testCtx('short-ref'), 'setup#Install', 'md');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.target.id).toBe('lat.md/guides/setup#Setup#Install');
@@ -565,8 +574,7 @@ describe('short-ref', () => {
 
   // @lat: [[ref-resolution#Short ref refs finds code references]]
   it('findRefs with short query finds code refs', async () => {
-    const projectRoot = caseDir('short-ref');
-    const result = await findRefs(lat, projectRoot, 'setup#Configure', 'code');
+    const result = await findRefs(testCtx('short-ref'), 'setup#Configure', 'code');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.target.id).toBe('lat.md/guides/setup#Setup#Configure');
@@ -602,10 +610,8 @@ describe('full-ref', () => {
 
   // @lat: [[ref-resolution#Full ref refs finds md references]]
   it('findRefs with full query finds md wiki links', async () => {
-    const projectRoot = caseDir('full-ref');
     const result = await findRefs(
-      lat,
-      projectRoot,
+      testCtx('full-ref'),
       'lat.md/guides/setup#Setup#Install',
       'md',
     );
@@ -617,10 +623,8 @@ describe('full-ref', () => {
 
   // @lat: [[ref-resolution#Full ref refs finds code references]]
   it('findRefs with full query finds code refs', async () => {
-    const projectRoot = caseDir('full-ref');
     const result = await findRefs(
-      lat,
-      projectRoot,
+      testCtx('full-ref'),
       'lat.md/guides/setup#Setup#Configure',
       'code',
     );
@@ -935,19 +939,16 @@ describe('error-source-ref-unsupported-ext', () => {
 describe('getSection', () => {
   // @lat: [[tests/section#Nonexistent section returns no-match]]
   it('returns no-match for nonexistent section', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
-    const result = await getSection(lat, projectRoot, 'nonexistent-xyz');
+    const ctx = testCtx('basic-project');
+    const result = await getSection(ctx, 'nonexistent-xyz');
     expect(result.kind).toBe('no-match');
   });
 
   // @lat: [[tests/section#Full id resolves to section]]
   it('finds section by full id', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
+    const ctx = testCtx('basic-project');
     const result = await getSection(
-      lat,
-      projectRoot,
+      ctx,
       'lat.md/dev-process#Dev Process#Testing',
     );
     expect(result.kind).toBe('found');
@@ -958,9 +959,8 @@ describe('getSection', () => {
 
   // @lat: [[tests/section#Short id resolves to section]]
   it('finds section by short id', async () => {
-    const lat = latDir('short-ref');
-    const projectRoot = caseDir('short-ref');
-    const result = await getSection(lat, projectRoot, 'setup#Install');
+    const ctx = testCtx('short-ref');
+    const result = await getSection(ctx, 'setup#Install');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.section.id).toBe('lat.md/guides/setup#Setup#Install');
@@ -968,11 +968,9 @@ describe('getSection', () => {
 
   // @lat: [[tests/section#Section with no refs or links]]
   it('returns empty refs for section with no refs or links', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
+    const ctx = testCtx('basic-project');
     const result = await getSection(
-      lat,
-      projectRoot,
+      ctx,
       'lat.md/dev-process#Dev Process#Formatting',
     );
     expect(result.kind).toBe('found');
@@ -983,13 +981,8 @@ describe('getSection', () => {
 
   // @lat: [[tests/section#Section with outgoing refs only]]
   it('returns outgoing refs for section that links to others', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
-    const result = await getSection(
-      lat,
-      projectRoot,
-      'lat.md/notes#Notes#Second Topic',
-    );
+    const ctx = testCtx('basic-project');
+    const result = await getSection(ctx, 'lat.md/notes#Notes#Second Topic');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.outgoingRefs.length).toBeGreaterThan(0);
@@ -1001,11 +994,9 @@ describe('getSection', () => {
 
   // @lat: [[tests/section#Section with incoming refs only]]
   it('returns incoming refs for section referenced by others', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
+    const ctx = testCtx('basic-project');
     const result = await getSection(
-      lat,
-      projectRoot,
+      ctx,
       'lat.md/dev-process#Dev Process#Testing',
     );
     expect(result.kind).toBe('found');
@@ -1018,42 +1009,27 @@ describe('getSection', () => {
 
   // @lat: [[tests/section#Section with both outgoing and incoming refs]]
   it('returns both outgoing and incoming refs', async () => {
-    const lat = latDir('short-ref');
-    const projectRoot = caseDir('short-ref');
-    // setup#Install is referenced by links.md, and links.md references setup#Install
-    // So links#Links has outgoing (to setup#Install) and is referenced by nobody
-    // setup#Setup#Install has incoming (from links#Links) and no outgoing
-    // We need a section with both — let's check if setup#Setup has both
-    // Actually, let's use a fixture where this is true.
-    // In short-ref: links#Links references setup#Install
-    // setup#Install has incoming from links#Links but no outgoing
-    // To get both, we'd need a section that both references and is referenced.
-    // basic-project doesn't have that either. Let's verify the formatted output instead.
-    const result = await getSection(lat, projectRoot, 'setup#Install');
+    const ctx = testCtx('short-ref');
+    const result = await getSection(ctx, 'setup#Install');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     expect(result.incomingRefs.length).toBeGreaterThan(0);
     // Verify formatSectionOutput includes incoming
-    const output = formatSectionOutput(result, projectRoot);
-    expect(output).toContain('**Referenced by:**');
+    const output = formatSectionOutput(ctx, result);
+    expect(output).toContain('Referenced by:');
     expect(output).toContain('lat.md/links#Links');
   });
 
   // @lat: [[tests/section#formatSectionOutput includes all parts]]
   it('formatSectionOutput includes content and refs', async () => {
-    const lat = latDir('basic-project');
-    const projectRoot = caseDir('basic-project');
-    const result = await getSection(
-      lat,
-      projectRoot,
-      'lat.md/notes#Notes#Second Topic',
-    );
+    const ctx = testCtx('basic-project');
+    const result = await getSection(ctx, 'lat.md/notes#Notes#Second Topic');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
-    const output = formatSectionOutput(result, projectRoot);
+    const output = formatSectionOutput(ctx, result);
     expect(output).toContain('[[lat.md/notes#Notes#Second Topic]]');
     expect(output).toContain('See [[dev-process#Testing]]');
-    expect(output).toContain('**This section references:**');
+    expect(output).toContain('This section references:');
     expect(output).toContain('lat.md/dev-process#Dev Process#Testing');
   });
 });

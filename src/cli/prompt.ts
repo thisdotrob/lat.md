@@ -5,7 +5,7 @@ import {
   type Section,
   type SectionMatch,
 } from '../lattice.js';
-import type { CliContext } from './context.js';
+import type { CmdContext, CmdResult } from '../context.js';
 
 const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
 
@@ -25,14 +25,13 @@ type ResolvedRef = {
  * Returns null if there are no wiki links, or if resolution fails.
  */
 export async function expandPrompt(
-  latDir: string,
-  projectRoot: string,
+  ctx: CmdContext,
   text: string,
 ): Promise<string | null> {
   const refs = [...text.matchAll(WIKI_LINK_RE)];
   if (refs.length === 0) return null;
 
-  const allSections = await loadAllSections(latDir);
+  const allSections = await loadAllSections(ctx.latDir);
   const resolved = new Map<string, ResolvedRef>();
   const errors: string[] = [];
 
@@ -77,7 +76,7 @@ export async function expandPrompt(
     for (const m of all) {
       const reason = isExact ? '' : ` (${m.reason})`;
       output += `  * [[${m.section.id}]]${reason}\n`;
-      output += `    * ${formatLocation(m.section, projectRoot)}\n`;
+      output += `    * ${formatLocation(m.section, ctx.projectRoot)}\n`;
       if (m.section.body) {
         output += `    * ${m.section.body}\n`;
       }
@@ -88,34 +87,38 @@ export async function expandPrompt(
   return output;
 }
 
-export async function promptCmd(ctx: CliContext, text: string): Promise<void> {
-  const result = await expandPrompt(ctx.latDir, ctx.projectRoot, text);
+export async function promptCommand(
+  ctx: CmdContext,
+  text: string,
+): Promise<CmdResult> {
+  const result = await expandPrompt(ctx, text);
 
   if (result === null) {
-    // Either no wiki links or resolution failed — check which
     const refs = [...text.matchAll(WIKI_LINK_RE)];
     if (refs.length === 0) {
-      process.stdout.write(text);
-      return;
+      return { output: text };
     }
 
-    // Resolution failed — re-run to produce error messages
+    // Resolution failed — find which ref is broken
     const allSections = await loadAllSections(ctx.latDir);
     for (const match of refs) {
       const target = match[1];
       const matches = findSections(allSections, target);
       if (matches.length === 0) {
-        console.error(
-          ctx.chalk.red(
-            `No section found for [[${target}]] (no exact, substring, or fuzzy matches).`,
-          ),
-        );
-        console.error(ctx.chalk.dim('Ask the user to correct the reference.'));
-        process.exit(1);
+        const s = ctx.styler;
+        return {
+          output:
+            s.red(`No section found for [[${target}]]`) +
+            ' (no exact, substring, or fuzzy matches).\n' +
+            s.dim('Ask the user to correct the reference.'),
+          isError: true,
+        };
       }
     }
-    return;
+
+    // All refs matched individually but expansion still failed — shouldn't happen
+    return { output: text };
   }
 
-  process.stdout.write(result);
+  return { output: result };
 }

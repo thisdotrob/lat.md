@@ -1,12 +1,9 @@
 import { dirname } from 'node:path';
 import { findLatticeDir } from '../lattice.js';
+import { plainStyler, type CmdContext } from '../context.js';
 import { expandPrompt } from './prompt.js';
 import { runSearch } from './search.js';
-import {
-  getSection,
-  formatSectionOutput,
-  type SectionFound,
-} from './section.js';
+import { getSection, formatSectionOutput } from './section.js';
 import { getLlmKey } from '../config.js';
 
 function outputPromptSubmit(context: string): void {
@@ -41,9 +38,17 @@ function hasWikiLinks(text: string): boolean {
   return /\[\[[^\]]+\]\]/.test(text);
 }
 
+function makeHookCtx(latDir: string): CmdContext {
+  return {
+    latDir,
+    projectRoot: dirname(latDir),
+    styler: plainStyler,
+    mode: 'cli',
+  };
+}
+
 async function searchAndExpand(
-  latDir: string,
-  projectRoot: string,
+  ctx: CmdContext,
   userPrompt: string,
 ): Promise<string | null> {
   let key: string | undefined;
@@ -54,7 +59,7 @@ async function searchAndExpand(
   }
   if (!key) return null;
 
-  const result = await runSearch(latDir, userPrompt, key, 5);
+  const result = await runSearch(ctx.latDir, userPrompt, key, 5);
   if (result.matches.length === 0) return null;
 
   const parts: string[] = [
@@ -63,13 +68,9 @@ async function searchAndExpand(
   ];
 
   for (const match of result.matches) {
-    const sectionResult = await getSection(
-      latDir,
-      projectRoot,
-      match.section.id,
-    );
+    const sectionResult = await getSection(ctx, match.section.id);
     if (sectionResult.kind === 'found') {
-      parts.push(formatSectionOutput(sectionResult, projectRoot));
+      parts.push(formatSectionOutput(ctx, sectionResult));
       parts.push('');
     }
   }
@@ -98,12 +99,12 @@ async function handleUserPromptSubmit(): Promise<void> {
 
   const latDir = findLatticeDir();
   if (latDir && userPrompt) {
-    const projectRoot = dirname(latDir);
+    const ctx = makeHookCtx(latDir);
 
     // If the user prompt contains [[refs]], resolve them inline
     if (hasWikiLinks(userPrompt)) {
       try {
-        const expanded = await expandPrompt(latDir, projectRoot, userPrompt);
+        const expanded = await expandPrompt(ctx, userPrompt);
         if (expanded) {
           parts.push(
             '',
@@ -126,11 +127,7 @@ async function handleUserPromptSubmit(): Promise<void> {
 
     // Search for relevant sections and include their full content
     try {
-      const searchContext = await searchAndExpand(
-        latDir,
-        projectRoot,
-        userPrompt,
-      );
+      const searchContext = await searchAndExpand(ctx, userPrompt);
       if (searchContext) {
         parts.push('', searchContext);
       }

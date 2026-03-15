@@ -1,18 +1,27 @@
 import { dirname } from 'node:path';
-import chalk, { type ChalkInstance } from 'chalk';
+import chalk from 'chalk';
 import { findLatticeDir } from '../lattice.js';
+import type { CmdContext, Styler } from '../context.js';
 
-export type CliContext = {
-  latDir: string;
-  projectRoot: string;
-  color: boolean;
-  chalk: ChalkInstance;
-};
+export type { CmdContext };
+
+function makeChalkStyler(): Styler {
+  return {
+    bold: (s) => chalk.bold(s),
+    dim: (s) => chalk.dim(s),
+    red: (s) => chalk.red(s),
+    cyan: (s) => chalk.cyan(s),
+    white: (s) => chalk.white(s),
+    green: (s) => chalk.green(s),
+    yellow: (s) => chalk.yellow(s),
+    boldWhite: (s) => chalk.bold.white(s),
+  };
+}
 
 export function resolveContext(opts: {
   dir?: string;
   color?: boolean;
-}): CliContext {
+}): CmdContext {
   const color = opts.color !== false;
   if (!color) {
     chalk.level = 0;
@@ -26,5 +35,5 @@ export function resolveContext(opts: {
   }
 
   const projectRoot = dirname(latDir);
-  return { latDir, projectRoot, color, chalk };
+  return { latDir, projectRoot, styler: makeChalkStyler(), mode: 'cli' };
 }
