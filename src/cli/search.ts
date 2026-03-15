@@ -168,8 +168,7 @@ export async function searchCmd(
   );
   console.log(
     '\nTo navigate further:\n' +
-      '- `lat locate "Section Name"` — jump to a section by name\n' +
-      '- `lat refs "section#id"` — find what references a section\n' +
+      '- `lat section "section#id"` — show full content with outgoing/incoming refs\n' +
       '- `lat search "new query"` — search for something else',
   );
 }

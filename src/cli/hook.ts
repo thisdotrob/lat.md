@@ -1,6 +1,13 @@
 import { dirname } from 'node:path';
 import { findLatticeDir } from '../lattice.js';
 import { expandPrompt } from './prompt.js';
+import { runSearch } from './search.js';
+import {
+  getSection,
+  formatSectionOutput,
+  type SectionFound,
+} from './section.js';
+import { getLlmKey } from '../config.js';
 
 function outputPromptSubmit(context: string): void {
   process.stdout.write(
@@ -34,6 +41,42 @@ function hasWikiLinks(text: string): boolean {
   return /\[\[[^\]]+\]\]/.test(text);
 }
 
+async function searchAndExpand(
+  latDir: string,
+  projectRoot: string,
+  userPrompt: string,
+): Promise<string | null> {
+  let key: string | undefined;
+  try {
+    key = getLlmKey();
+  } catch {
+    return null;
+  }
+  if (!key) return null;
+
+  const result = await runSearch(latDir, userPrompt, key, 5);
+  if (result.matches.length === 0) return null;
+
+  const parts: string[] = [
+    `Search results for the user prompt (${result.matches.length} matches):`,
+    '',
+  ];
+
+  for (const match of result.matches) {
+    const sectionResult = await getSection(
+      latDir,
+      projectRoot,
+      match.section.id,
+    );
+    if (sectionResult.kind === 'found') {
+      parts.push(formatSectionOutput(sectionResult, projectRoot));
+      parts.push('');
+    }
+  }
+
+  return parts.join('\n');
+}
+
 async function handleUserPromptSubmit(): Promise<void> {
   let userPrompt = '';
   try {
@@ -48,17 +91,17 @@ async function handleUserPromptSubmit(): Promise<void> {
 
   parts.push(
     'Before starting work on this task:',
-    '1. Run `lat search` with a query relevant to the task to understand the design intent.',
-    '2. Use `lat locate`, `lat refs` to navigate the knowledge graph as needed.',
-    '3. After completing work, run `lat check` to validate all links and code refs.',
+    '1. Use `lat search` and `lat section` to navigate the knowledge graph as needed.',
+    '2. After completing work, run `lat check` to validate all links and code refs.',
     'Do not skip these steps.',
   );
 
-  // If the user prompt contains [[refs]], resolve them inline
-  if (userPrompt && hasWikiLinks(userPrompt)) {
-    const latDir = findLatticeDir();
-    if (latDir) {
-      const projectRoot = dirname(latDir);
+  const latDir = findLatticeDir();
+  if (latDir && userPrompt) {
+    const projectRoot = dirname(latDir);
+
+    // If the user prompt contains [[refs]], resolve them inline
+    if (hasWikiLinks(userPrompt)) {
       try {
         const expanded = await expandPrompt(latDir, projectRoot, userPrompt);
         if (expanded) {
@@ -79,6 +122,20 @@ async function handleUserPromptSubmit(): Promise<void> {
           'NOTE: The user prompt contains [[refs]] but resolution failed. Run `lat prompt` on the prompt text manually.',
         );
       }
+    }
+
+    // Search for relevant sections and include their full content
+    try {
+      const searchContext = await searchAndExpand(
+        latDir,
+        projectRoot,
+        userPrompt,
+      );
+      if (searchContext) {
+        parts.push('', searchContext);
+      }
+    } catch {
+      // Search failed (no key, index error, etc.) — agent can search manually
     }
   }
 

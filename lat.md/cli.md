@@ -2,6 +2,8 @@
 
 The `lat` command line tool. Entry point: [[src/cli/index.ts]].
 
+**Design principle: shared core, thin wrappers.** Every CLI command and its corresponding [[cli#mcp]] tool must share the same core function. The core function (e.g. `getSection`, `findRefs`, `runSearch`) lives in `src/cli/` and returns structured data. CLI commands are thin wrappers that add chalk coloring and `process.exit`. MCP tools are thin wrappers that format plain text. Never duplicate business logic between CLI and MCP.
+
 ## locate
 
 Find sections by query. Strips `[[brackets]]` and leading `#` from the query before searching. Results are returned in priority order:
@@ -17,6 +19,22 @@ Outputs a [[cli#Section Preview]] for each match.
 Usage: `lat locate <query>`
 
 Implementation: [[src/cli/locate.ts]], matching logic in [[src/lattice.ts#findSections]]
+
+## section
+
+Show a section's full content along with its outgoing and incoming wiki link references. Designed as a companion to [[cli#search]] — search gives RAG results, `section` facilitates browsing them by showing the full context of each result.
+
+Accepts any valid section id (short-form, full-path, with or without `[[brackets]]`). Uses the same resolution logic as [[cli#refs]].
+
+Output:
+1. Section header with id and file location
+2. Raw markdown content between `startLine` and `endLine`
+3. **This section references** — all wiki link targets found within the section, with body descriptions
+4. **Referenced by** — other sections in `lat.md/` that contain wiki links pointing to this section
+
+Usage: `lat section <query>`
+
+Core logic in [[src/cli/section.ts#getSection]] (returns structured result), used by both the CLI command and [[cli#mcp]] `lat_section` tool.
 
 ## refs
 
@@ -150,7 +168,11 @@ Currently supports `claude` agent with two events:
 
 ### UserPromptSubmit
 
-Reads the hook input from stdin (JSON with `user_prompt`). Outputs JSON with `additionalContext` that reminds the agent to use `lat search`, `lat locate`, and `lat refs` for navigating the knowledge graph. If the user prompt contains `[[refs]]`, resolves them inline using [[src/cli/prompt.ts#expandPrompt]] and includes the expanded context directly — the agent never needs to run `lat prompt` itself.
+Reads the hook input from stdin (JSON with `user_prompt`). Outputs JSON with `additionalContext` containing:
+
+1. Instructions to use `lat search`, `lat section`, `lat locate`, `lat refs` for navigation
+2. If the prompt contains `[[refs]]`, resolves them inline using [[src/cli/prompt.ts#expandPrompt]]
+3. Runs [[src/cli/search.ts#runSearch]] on the user prompt, then [[src/cli/section.ts#getSection]] + [[src/cli/section.ts#formatSectionOutput]] on each result — the agent gets full section content with outgoing/incoming refs before it starts work. Gracefully degrades if no LLM key is configured.
 
 ### Stop
 
@@ -164,9 +186,10 @@ Start the MCP (Model Context Protocol) server over stdio. Exposes lat.md tools t
 
 Usage: `lat mcp`
 
-Clients invoke this as `lat mcp`. The `lat init` wizard registers the MCP server using the absolute path to the current `lat` binary, so it works regardless of how `lat` was installed. The server exposes 5 tools:
+Clients invoke this as `lat mcp`. The `lat init` wizard registers the MCP server using the absolute path to the current `lat` binary, so it works regardless of how `lat` was installed. The server exposes 6 tools:
 
 - **lat_locate** — find sections by name (wraps [[cli#locate]])
+- **lat_section** — show section content with outgoing/incoming refs (wraps [[cli#section]])
 - **lat_search** — semantic search across sections (wraps [[cli#search]])
 - **lat_prompt** — expand `[[refs]]` in text (wraps [[cli#prompt]])
 - **lat_check** — validate links and code refs (wraps [[cli#check]])

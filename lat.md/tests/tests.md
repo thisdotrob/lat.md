@@ -23,3 +23,4 @@ High-level test descriptions. Actual test code lives in `tests/`.
 - [[ref-resolution]] — Wiki link and code ref resolution across vault subdirectories
 - [[mcp]] — MCP server tool listing and tool call responses
 - [[roundtrip]] — Parse → render fidelity for all markdown and wiki link features
+- [[section]] — getSection core function and formatSectionOutput formatter

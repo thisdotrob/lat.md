@@ -44,6 +44,7 @@ describe('mcp', () => {
       'lat_prompt',
       'lat_refs',
       'lat_search',
+      'lat_section',
     ]);
   });
 
@@ -86,6 +87,29 @@ describe('mcp', () => {
     });
     const text = (result.content as { type: string; text: string }[])[0].text;
     expect(text).toBe('No refs here');
+  });
+
+  // @lat: [[tests/mcp#lat_section shows section content]]
+  it('lat_section shows section content with refs', async () => {
+    const result = await client.callTool({
+      name: 'lat_section',
+      arguments: { query: 'notes#Second Topic' },
+    });
+    const text = (result.content as { type: string; text: string }[])[0].text;
+    expect(text).toContain('lat.md/notes#Notes#Second Topic');
+    expect(text).toContain('See [[dev-process#Testing]]');
+    expect(text).toContain('**This section references:**');
+    expect(text).toContain('lat.md/dev-process#Dev Process#Testing');
+  });
+
+  // @lat: [[tests/mcp#lat_section returns message for missing section]]
+  it('lat_section returns message for missing section', async () => {
+    const result = await client.callTool({
+      name: 'lat_section',
+      arguments: { query: 'nonexistent-section-xyz' },
+    });
+    const text = (result.content as { type: string; text: string }[])[0].text;
+    expect(text).toContain('No sections matching');
   });
 
   // @lat: [[tests/mcp#lat_check reports errors]]

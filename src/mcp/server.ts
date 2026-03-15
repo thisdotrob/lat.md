@@ -13,6 +13,7 @@ import { checkMd, checkCodeRefs, checkIndex } from '../cli/check.js';
 import { findRefs, type Scope } from '../cli/refs.js';
 import { runSearch } from '../cli/search.js';
 import { expandPrompt } from '../cli/prompt.js';
+import { getSection, formatSectionOutput } from '../cli/section.js';
 
 function formatSection(s: Section, projectRoot: string): string {
   const relPath = relative(process.cwd(), join(projectRoot, s.filePath));
@@ -83,6 +84,31 @@ export async function startMcpServer(): Promise<void> {
   );
 
   server.tool(
+    'lat_section',
+    'Show a section with its content, outgoing wiki link targets, and incoming references',
+    {
+      query: z.string().describe('Section id to look up (short or full form)'),
+    },
+    async ({ query }) => {
+      const result = await getSection(latDir, projectRoot, query);
+
+      if (result.kind === 'no-match') {
+        if (result.suggestions.length > 0) {
+          const suggestions = result.suggestions
+            .map((m) => `  * ${m.section.id} (${m.reason})`)
+            .join('\n');
+          return text(
+            `No section "${query}" found. Did you mean:\n${suggestions}`,
+          );
+        }
+        return text(`No sections matching "${query}"`);
+      }
+
+      return text(formatSectionOutput(result, projectRoot));
+    },
+  );
+
+  server.tool(
     'lat_search',
     'Semantic search across lat.md sections using embeddings',
     {
@@ -120,8 +146,7 @@ export async function startMcpServer(): Promise<void> {
           projectRoot,
         ) +
         '\n\nTo navigate further:\n' +
-        '- `lat_locate` — jump to a section by name\n' +
-        '- `lat_refs` — find what references a section\n' +
+        '- `lat_section` — show full content with outgoing/incoming refs\n' +
         '- `lat_search` — search for something else';
 
       return text(output);

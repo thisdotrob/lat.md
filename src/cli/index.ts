@@ -48,6 +48,18 @@ program
   });
 
 program
+  .command('section')
+  .description(
+    'Show a section with its content, outgoing refs, and incoming refs',
+  )
+  .argument('<query>', 'section id to look up')
+  .action(async (query: string) => {
+    const ctx = resolveContext(program.opts());
+    const { sectionCmd } = await import('./section.js');
+    await sectionCmd(ctx, query);
+  });
+
+program
   .command('refs')
   .description('Find references to a section')
   .argument('<query>', 'section id to find references for')
