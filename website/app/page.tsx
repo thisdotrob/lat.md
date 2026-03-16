@@ -89,7 +89,7 @@ export default function Home() {
       </p>
 
       {/* Goals + Install + Key Ideas */}
-      <div style={{ marginTop: '2vh' }}>
+      <div style={{ marginTop: '2vh', maxWidth: '55ch' }}>
 
         {/* Goals */}
         <div>
@@ -167,6 +167,51 @@ export default function Home() {
               >
                 README →
               </a>
+            </li>
+          </ul>
+        </div>
+
+        {/* What's New */}
+        <div style={{ marginTop: '5vh' }}>
+          <SectionLabel>{"What's New"}</SectionLabel>
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              fontSize: 14,
+              lineHeight: 1.45,
+              color: '#888',
+            }}
+          >
+            <li style={{ display: 'flex', gap: '1.5ch', paddingLeft: 0, textIndent: 0 }}>
+              <span style={{ color: '#555', flexShrink: 0 }}>0.7</span>
+              <span>
+                Multi-language source links (Rust, Go, C); <Cmd>lat section</Cmd>{' '}
+                and <Cmd>lat expand</Cmd> commands; section structure validation;
+                smarter <Cmd>lat init</Cmd> with versioning &amp; hook sync
+              </span>
+            </li>
+            <li style={{ display: 'flex', gap: '1.5ch', paddingLeft: 0, textIndent: 0 }}>
+              <span style={{ color: '#555', flexShrink: 0 }}>0.6</span>
+              <span>
+                Source code wiki links — reference functions and classes directly
+                from specs: <Cmd>{'[[src/foo.ts#myFunc]]'}</Cmd>
+              </span>
+            </li>
+            <li style={{ display: 'flex', gap: '1.5ch', paddingLeft: 0, textIndent: 0 }}>
+              <span style={{ color: '#555', flexShrink: 0 }}>0.5</span>
+              <span>
+                Auto-suggest <Cmd>lat init</Cmd> when no <Cmd>lat.md/</Cmd> found;
+                section IDs now include h1 heading; wiki links in index files
+              </span>
+            </li>
+            <li style={{ display: 'flex', gap: '1.5ch', paddingLeft: 0, textIndent: 0 }}>
+              <span style={{ color: '#555', flexShrink: 0 }}>0.4</span>
+              <span>
+                MCP server for editor integration; multi-agent <Cmd>lat init</Cmd>;
+                flexible API key config via env, file, or helper command
+              </span>
             </li>
           </ul>
         </div>

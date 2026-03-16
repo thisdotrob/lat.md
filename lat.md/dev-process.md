@@ -60,6 +60,7 @@ How to publish a new version:
 5. **Switch back to main** — check out `main` so the working tree is not left on the release branch
 6. **Push main and open a PR** — push `main` first (so the release branch diff is clean), then push the release branch and create a PR with the changelog as the body
 7. **Merge** — once CI passes and the PR is merged to `main`, the [[dev-process#Publishing#Publish Workflow]] takes over
+8. **Update [[website]]** — add an entry to the "What's New" section in `website/app/page.tsx` with the version number and a brief summary of user-facing changes
 
 Version numbers follow semver. While pre-1.0, bump the patch for fixes and the minor for features/breaking changes.
 
