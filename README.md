@@ -33,7 +33,7 @@ After installing, run `lat init` in the repo you want to use lat in.
 
 ## How it works
 
-Run `lat init` to scaffold a `lat.md/` directory, then write markdown files describing your architecture, business logic, test specs — whatever matters. Link between sections using `[[file#Section#Subsection]]` syntax. Annotate source code with `// @lat: [[section-id]]` (or `# @lat: [[section-id]]` in Python) comments to tie implementation back to concepts.
+Run `lat init` to scaffold a `lat.md/` directory, then write markdown files describing your architecture, business logic, test specs — whatever matters. Link between sections using `[[file#Section#Subsection]]` syntax. Link to source code symbols with `[[src/auth.ts#validateToken]]`. Annotate source code with `// @lat: [[section-id]]` (or `# @lat: [[section-id]]` in Python) comments to tie implementation back to concepts.
 
 ```
 my-project/
@@ -53,9 +53,10 @@ my-project/
 npx lat.md init                        # scaffold a lat.md/ directory
 npx lat.md check                       # validate all wiki links and code refs
 npx lat.md locate "OAuth Flow"         # find sections by name (exact, fuzzy)
+npx lat.md section "auth#OAuth Flow"   # show a section with its links and refs
 npx lat.md refs "auth#OAuth Flow"      # find what references a section
 npx lat.md search "how do we auth?"    # semantic search via embeddings
-npx lat.md prompt "fix [[OAuth Flow]]" # expand [[refs]] in a prompt for agents
+npx lat.md expand "fix [[OAuth Flow]]" # expand [[refs]] in a prompt for agents
 ```
 
 ## Configuration
