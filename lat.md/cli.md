@@ -28,9 +28,10 @@ Accepts any valid section id (short-form, full-path, with or without `[[brackets
 
 Output:
 1. Section header with id and file location
-2. Raw markdown content between `startLine` and `endLine`
+2. Section content blockquoted (`>`) between `startLine` and `endLine`
 3. **This section references** — all wiki link targets found within the section, with body descriptions
 4. **Referenced by** — other sections in `lat.md/` that contain wiki links pointing to this section
+5. **Navigation hints** — same footer as [[cli#search]], suggesting `lat section` and `lat search` as next steps
 
 Usage: `lat section <query>`
 
@@ -300,6 +301,6 @@ Shared output format used by [[cli#locate]], [[cli#refs]], and [[cli#search]]. E
 4. "Defined in" label with file path (cyan) and line range
 5. Body text quoted with `>` (first paragraph, guaranteed ≤250 chars by [[cli#check#sections]])
 
-Commands that return multiple results use `formatResultList()` which adds a bold header and consistent spacing.
+Commands that return multiple results use `formatResultList()` which adds a markdown `##` heading and consistent spacing.
 
-Implementation: [[src/format.ts]] — exports [[src/format.ts#formatSectionId]], [[src/format.ts#formatSectionPreview]], and [[src/format.ts#formatResultList]]
+Implementation: [[src/format.ts]] — exports [[src/format.ts#formatSectionId]], [[src/format.ts#formatSectionPreview]], [[src/format.ts#formatResultList]], and [[src/format.ts#formatNavHints]]

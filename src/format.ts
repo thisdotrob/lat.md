@@ -40,7 +40,7 @@ export function formatResultList(
   header: string,
   matches: SectionMatch[],
 ): string {
-  const lines: string[] = ['', ctx.styler.bold(header), ''];
+  const lines: string[] = ['', `## ${header}`, ''];
 
   for (let i = 0; i < matches.length; i++) {
     if (i > 0) lines.push('');
@@ -53,4 +53,15 @@ export function formatResultList(
 
   lines.push('');
   return lines.join('\n');
+}
+
+export function formatNavHints(ctx: CmdContext): string {
+  const s = ctx.styler;
+  const hints =
+    ctx.mode === 'cli'
+      ? `${s.dim('*')} \`lat section "section#id"\` \u2014 show full content with outgoing/incoming refs\n` +
+        `${s.dim('*')} \`lat search "new query"\` \u2014 search for something else`
+      : `${s.dim('*')} \`lat_section\` \u2014 show full content with outgoing/incoming refs\n` +
+        `${s.dim('*')} \`lat_search\` \u2014 search for something else`;
+  return `\n## To navigate further:\n\n${hints}`;
 }

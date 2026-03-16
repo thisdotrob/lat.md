@@ -164,7 +164,7 @@ export async function refsCommand(
 
   if (codeRefs.length > 0) {
     parts.push(
-      s.bold('Code references:') +
+      '## Code references:' +
         '\n\n' +
         codeRefs.map((l) => `${s.dim('*')} ${l}`).join('\n'),
     );

@@ -12,7 +12,7 @@ import {
   type SectionMatch,
 } from '../lattice.js';
 import type { CmdContext, CmdResult } from '../context.js';
-import { formatSectionId } from '../format.js';
+import { formatSectionId, formatNavHints } from '../format.js';
 
 export type SectionFound = {
   kind: 'found';
@@ -136,14 +136,19 @@ export function formatSectionOutput(
   );
   const loc = `${s.cyan(relPath)}${s.dim(`:${section.startLine}-${section.endLine}`)}`;
 
+  const quoted = content
+    .split('\n')
+    .map((line) => (line ? `> ${line}` : '>'))
+    .join('\n');
+
   const parts: string[] = [
     `${s.bold('[[' + formatSectionId(section.id, s) + ']]')} (${loc})`,
     '',
-    content,
+    quoted,
   ];
 
   if (outgoingRefs.length > 0) {
-    parts.push('', s.bold('This section references:'), '');
+    parts.push('', '## This section references:', '');
     for (const ref of outgoingRefs) {
       const body = ref.resolved.firstParagraph
         ? ` ${s.dim('—')} ${truncate(ref.resolved.firstParagraph, 120)}`
@@ -155,7 +160,7 @@ export function formatSectionOutput(
   }
 
   if (incomingRefs.length > 0) {
-    parts.push('', s.bold('Referenced by:'), '');
+    parts.push('', '## Referenced by:', '');
     for (const ref of incomingRefs) {
       const body = ref.section.firstParagraph
         ? ` ${s.dim('—')} ${truncate(ref.section.firstParagraph, 120)}`
@@ -165,6 +170,8 @@ export function formatSectionOutput(
       );
     }
   }
+
+  parts.push(formatNavHints(ctx));
 
   return parts.join('\n');
 }

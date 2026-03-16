@@ -8,7 +8,7 @@ import {
   flattenSections,
   type SectionMatch,
 } from '../lattice.js';
-import { formatResultList } from '../format.js';
+import { formatResultList, formatNavHints } from '../format.js';
 
 export type SearchResult = {
   query: string;
@@ -156,17 +156,9 @@ export async function searchCommand(
     return { output: 'No results found.' };
   }
 
-  const navHints =
-    ctx.mode === 'cli'
-      ? '- `lat section "section#id"` \u2014 show full content with outgoing/incoming refs\n' +
-        '- `lat search "new query"` \u2014 search for something else'
-      : '- `lat_section` \u2014 show full content with outgoing/incoming refs\n' +
-        '- `lat_search` \u2014 search for something else';
-
   return {
     output:
       formatResultList(ctx, `Search results for "${query}":`, result.matches) +
-      '\nTo navigate further:\n' +
-      navHints,
+      formatNavHints(ctx),
   };
 }
