@@ -62,7 +62,10 @@ function hasLatHook(settingsPath: string, event: string): boolean {
         (h) => h.command?.includes('lat') && h.command?.includes(event),
       ),
     );
-  } catch {
+  } catch (err) {
+    process.stderr.write(
+      `Warning: failed to parse ${settingsPath}: ${(err as Error).message}\n`,
+    );
     return false;
   }
 }
@@ -153,7 +156,10 @@ function hasMcpServer(configPath: string, key: string): boolean {
   try {
     const cfg = JSON.parse(readFileSync(configPath, 'utf-8'));
     return !!cfg?.[key]?.lat;
-  } catch {
+  } catch (err) {
+    process.stderr.write(
+      `Warning: failed to parse ${configPath}: ${(err as Error).message}\n`,
+    );
     return false;
   }
 }

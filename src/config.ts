@@ -24,8 +24,11 @@ export function readConfig(): LatConfig {
   if (!existsSync(configPath)) return {};
   try {
     return JSON.parse(readFileSync(configPath, 'utf-8'));
-  } catch {
-    return {};
+  } catch (err) {
+    process.stderr.write(
+      `Error: failed to parse config ${configPath}: ${(err as Error).message}\n`,
+    );
+    process.exit(1);
   }
 }
 

@@ -59,7 +59,10 @@ export async function scanCodeRefs(projectRoot: string): Promise<ScanResult> {
     let content: string;
     try {
       content = await readFile(file, 'utf-8');
-    } catch {
+    } catch (err) {
+      process.stderr.write(
+        `Error: failed to read ${file}: ${(err as Error).message}\n`,
+      );
       continue;
     }
     const lines = content.split('\n');
