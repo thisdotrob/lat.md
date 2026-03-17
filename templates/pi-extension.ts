@@ -159,12 +159,11 @@ export default function (pi: ExtensionAPI) {
     ].join("\n");
 
     return {
-      messages: [
-        {
-          role: "user" as const,
-          content: reminder,
-        },
-      ],
+      message: {
+        customType: "lat-reminder",
+        content: reminder,
+        display: true,
+      },
     };
   });
 
@@ -233,7 +232,7 @@ export default function (pi: ExtensionAPI) {
     }
 
     pi.sendMessage(
-      { role: "user", content: parts.join("\n") },
+      { customType: "lat-check", content: parts.join("\n"), display: true },
       { deliverAs: "followUp", triggerTurn: true },
     );
   });

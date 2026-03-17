@@ -157,7 +157,7 @@ Sets up `CLAUDE.md` and two agent hooks for the Claude Code coding agent.
 Sets up a Pi extension that registers lat tools as native Pi tools and hooks into the agent lifecycle.
 
 - `AGENTS.md` — shared instruction file (created in the shared step)
-- `.pi/extensions/lat.ts` — TypeScript extension generated from `templates/pi-extension.ts` with the absolute path to the `lat` binary injected. Registers six tools (`lat_search`, `lat_section`, `lat_locate`, `lat_check`, `lat_expand`, `lat_refs`) that shell out to the `lat` CLI. Hooks into `before_agent_start` (injects search reminders) and `agent_end` (runs `lat check` + diff analysis, sends follow-up message if something needs fixing).
+- `.pi/extensions/lat.ts` — TypeScript extension generated from `templates/pi-extension.ts` with the absolute path to the `lat` binary injected. Registers six tools (`lat_search`, `lat_section`, `lat_locate`, `lat_check`, `lat_expand`, `lat_refs`) that shell out to the `lat` CLI. Hooks into `before_agent_start` (injects a visible search reminder via `customType` message with `display: true`) and `agent_end` (runs `lat check` + diff analysis, sends a visible follow-up message if something needs fixing).
 - `.pi` directory added to `.gitignore` (extension contains local absolute paths)
 
 ### Cursor
