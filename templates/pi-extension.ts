@@ -1,7 +1,33 @@
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { keyHint } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@mariozechner/pi-tui";
 import { Box, Text } from "@mariozechner/pi-tui";
+
+const PREVIEW_LINES = 4;
+
+function collapsibleResult(
+  result: { content: Array<{ type: string; text?: string }> },
+  options: { expanded: boolean; isPartial: boolean },
+  theme: Theme,
+) {
+  const text = result.content?.[0]?.type === "text" ? (result.content[0] as { type: "text"; text: string }).text : "";
+  if (!text) return new Text(theme.fg("dim", "(empty)"), 0, 0);
+  if (options.isPartial) return new Text(theme.fg("dim", "…"), 0, 0);
+  if (options.expanded) return new Text(text, 0, 0);
+
+  const lines = text.split("\n");
+  if (lines.length <= PREVIEW_LINES) return new Text(text, 0, 0);
+
+  const preview = lines.slice(0, PREVIEW_LINES).join("\n");
+  const remaining = lines.length - PREVIEW_LINES;
+  const hint = keyHint("expandTools", "to expand");
+  return new Text(
+    preview + "\n" +
+    theme.fg("dim", `… ${remaining} more lines (${hint})`),
+    0, 0,
+  );
+}
 
 /** Absolute path to the lat binary, injected by `lat init`. */
 const LAT = "__LAT_BIN__";
@@ -56,6 +82,7 @@ export default function (pi: ExtensionAPI) {
         0, 0,
       );
     },
+    renderResult: collapsibleResult,
   });
 
   pi.registerTool({
@@ -85,6 +112,7 @@ export default function (pi: ExtensionAPI) {
         0, 0,
       );
     },
+    renderResult: collapsibleResult,
   });
 
   pi.registerTool({
