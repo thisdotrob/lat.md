@@ -1,8 +1,8 @@
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { keyHint } from "@mariozechner/pi-coding-agent";
+import { getMarkdownTheme, keyHint } from "@mariozechner/pi-coding-agent";
 import type { Theme } from "@mariozechner/pi-tui";
-import { Box, Text } from "@mariozechner/pi-tui";
+import { Box, Markdown, Text } from "@mariozechner/pi-tui";
 
 const PREVIEW_LINES = 4;
 
@@ -14,10 +14,11 @@ function collapsibleResult(
   const text = result.content?.[0]?.type === "text" ? (result.content[0] as { type: "text"; text: string }).text : "";
   if (!text) return new Text(theme.fg("dim", "(empty)"), 0, 0);
   if (options.isPartial) return new Text(theme.fg("dim", "…"), 0, 0);
-  if (options.expanded) return new Text(text, 0, 0);
+  const mdTheme = getMarkdownTheme();
+  if (options.expanded) return new Markdown(text, 0, 0, mdTheme);
 
   const lines = text.split("\n");
-  if (lines.length <= PREVIEW_LINES) return new Text(text, 0, 0);
+  if (lines.length <= PREVIEW_LINES) return new Markdown(text, 0, 0, mdTheme);
 
   const preview = lines.slice(0, PREVIEW_LINES).join("\n");
   const remaining = lines.length - PREVIEW_LINES;
@@ -223,7 +224,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerMessageRenderer("lat-reminder", (message, { expanded }, theme) => {
     const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
     if (expanded) {
-      box.addChild(new Text(theme.fg("accent", "lat.md") + " " + message.content, 0, 0));
+      box.addChild(new Text(theme.fg("accent", "lat.md"), 0, 0));
+      box.addChild(new Markdown(message.content, 0, 0, getMarkdownTheme()));
     } else {
       const hint = keyHint("expandTools", "to expand");
       box.addChild(new Text(
@@ -238,7 +240,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerMessageRenderer("lat-check", (message, { expanded }, theme) => {
     const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
     if (expanded) {
-      box.addChild(new Text(theme.fg("warning", "lat check") + " " + message.content, 0, 0));
+      box.addChild(new Text(theme.fg("warning", "lat check"), 0, 0));
+      box.addChild(new Markdown(message.content, 0, 0, getMarkdownTheme()));
     } else {
       const hint = keyHint("expandTools", "to expand");
       const firstLine = message.content.split("\n")[0];
