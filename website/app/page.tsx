@@ -1,5 +1,12 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+const logo = `\
+░██             ░██                                ░██
+░██             ░██                                ░██
+░██  ░██████  ░██████       ░█████████████   ░████████
+░██       ░██   ░██         ░██   ░██   ░██ ░██    ░██
+░██  ░███████   ░██         ░██   ░██   ░██ ░██    ░██
+░██ ░██   ░██   ░██         ░██   ░██   ░██ ░██   ░███
+░██  ░█████░██   ░███  ░██  ░██   ░██   ░██  ░█████░██
+`
 
 function Cmd({ children }: { children: React.ReactNode }) {
   return (
@@ -37,8 +44,6 @@ const mono =
   'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
 
 export default function Home() {
-  const logo = readFileSync(join(process.cwd(), '..', 'templates', 'logo.txt'), 'utf-8')
-
   return (
     <div
       style={{

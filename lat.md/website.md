@@ -6,4 +6,4 @@ Completely separate from the npm package — has its own `package.json`, `tsconf
 
 ## Current State
 
-Black page with centered monospace ASCII art logo. The logo is read at build time from the shared `templates/logo.txt` file.
+Black page with centered monospace ASCII art logo (inlined — Vercel deployments don't have access to the monorepo's `templates/` directory).
