@@ -939,6 +939,48 @@ describe('error-source-ref-unsupported-ext', () => {
   });
 });
 
+// --- source file refs ---
+
+describe('source-file-refs', () => {
+  const lat = latDir('source-ref-ts-valid');
+  const projectRoot = caseDir('source-ref-ts-valid');
+
+  // @lat: [[tests/refs-e2e#Source symbol query finds md sections]]
+  it('findRefs with source symbol query finds md sections', async () => {
+    const ctx = { latDir: lat, projectRoot, styler: plainStyler, mode: 'cli' as const };
+    const result = await findRefs(ctx, 'src/app.ts#greet', 'md');
+    expect(result.kind).toBe('found');
+    if (result.kind !== 'found') return;
+    expect(result.target.id).toBe('src/app.ts#greet');
+    expect(result.mdRefs.length).toBeGreaterThan(0);
+    const ids = result.mdRefs.map((r) => r.section.id);
+    expect(ids).toContain('lat.md/docs#Docs');
+  });
+
+  // @lat: [[tests/refs-e2e#File-level query finds all refs to that file]]
+  it('findRefs with file-level query finds all refs to that file', async () => {
+    const ctx = { latDir: lat, projectRoot, styler: plainStyler, mode: 'cli' as const };
+    const result = await findRefs(ctx, 'src/app.ts', 'md');
+    expect(result.kind).toBe('found');
+    if (result.kind !== 'found') return;
+    expect(result.target.id).toBe('src/app.ts');
+    // docs.md references greet, Greeter, Greeter#greet, DEFAULT_NAME — all in src/app.ts
+    expect(result.mdRefs.length).toBeGreaterThan(0);
+  });
+
+  // @lat: [[tests/refs-e2e#Source query returns no-match for nonexistent file]]
+  it('findRefs with source query returns no-match for nonexistent file', async () => {
+    const ctx = { latDir: lat, projectRoot, styler: plainStyler, mode: 'cli' as const };
+    // Nonexistent file falls through to section resolution, which also fails
+    const result = await findRefs(
+      ctx,
+      'src/nonexistent.ts#foo',
+      'md',
+    );
+    expect(result.kind).toBe('no-match');
+  });
+});
+
 // --- getSection ---
 
 describe('getSection', () => {

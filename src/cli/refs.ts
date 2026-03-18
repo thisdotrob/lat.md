@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { extname, join } from 'node:path';
 import {
   listLatticeFiles,
   loadAllSections,
@@ -30,9 +32,147 @@ export type RefsError = {
 
 export type RefsResult = RefsFound | RefsError;
 
+/** Extensions recognized as source code for ref queries. */
+const SOURCE_EXTS = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.py',
+  '.rs',
+  '.go',
+  '.c',
+  '.h',
+]);
+
 /**
- * Find all sections and code locations that reference a given section.
- * Accepts any valid section id (full-path, short-form, with or without brackets).
+ * Check if a query looks like a source file path (has a recognized extension
+ * and the file exists on disk).
+ */
+function isSourceQuery(
+  query: string,
+  projectRoot: string,
+): { filePart: string; symbolPart: string } | null {
+  const hashIdx = query.indexOf('#');
+  const filePart = hashIdx === -1 ? query : query.slice(0, hashIdx);
+  const symbolPart = hashIdx === -1 ? '' : query.slice(hashIdx + 1);
+  const ext = extname(filePart);
+  if (!SOURCE_EXTS.has(ext)) return null;
+  if (!existsSync(join(projectRoot, filePart))) return null;
+  return { filePart, symbolPart };
+}
+
+/**
+ * Find references to a source file or symbol across lat.md and code files.
+ * For file-level queries (no #symbol), matches all wiki links targeting
+ * that file or any symbol in it.
+ */
+async function findSourceRefs(
+  latDir: string,
+  projectRoot: string,
+  query: string,
+  scope: Scope,
+): Promise<RefsResult> {
+  const hashIdx = query.indexOf('#');
+  const filePart = hashIdx === -1 ? query : query.slice(0, hashIdx);
+  const isFileLevel = hashIdx === -1;
+  const queryLower = query.toLowerCase();
+  const fileLower = filePart.toLowerCase();
+
+  // Build a synthetic Section for the target
+  const target: Section = {
+    id: query,
+    heading: hashIdx === -1 ? filePart : query.slice(hashIdx + 1),
+    depth: 0,
+    file: filePart,
+    filePath: filePart,
+    children: [],
+    startLine: 0,
+    endLine: 0,
+    firstParagraph: '',
+  };
+
+  // Try to get real line info from the source parser
+  try {
+    const { resolveSourceSymbol } = await import('../source-parser.js');
+    if (hashIdx !== -1) {
+      const symbolPart = query.slice(hashIdx + 1);
+      const { found, symbols } = await resolveSourceSymbol(
+        filePart,
+        symbolPart,
+        projectRoot,
+      );
+      if (found) {
+        const parts = symbolPart.split('#');
+        const sym = symbols.find((s) =>
+          parts.length === 1
+            ? s.name === parts[0] && !s.parent
+            : s.name === parts[1] && s.parent === parts[0],
+        );
+        if (sym) {
+          target.startLine = sym.startLine;
+          target.endLine = sym.endLine;
+          target.firstParagraph = sym.signature;
+        }
+      }
+    }
+  } catch {
+    // source parser unavailable — proceed without line info
+  }
+
+  const allSections = await loadAllSections(latDir);
+  const flat = flattenSections(allSections);
+  const mdRefs: SectionMatch[] = [];
+  const codeRefs: string[] = [];
+
+  if (scope === 'md' || scope === 'md+code') {
+    const files = await listLatticeFiles(latDir);
+    const matchingFromSections = new Set<string>();
+    for (const file of files) {
+      const content = await readFile(file, 'utf-8');
+      const fileRefs = extractRefs(file, content, projectRoot);
+      for (const ref of fileRefs) {
+        const targetLower = ref.target.toLowerCase();
+        const matches = isFileLevel
+          ? targetLower === fileLower || targetLower.startsWith(fileLower + '#')
+          : targetLower === queryLower;
+        if (matches) {
+          matchingFromSections.add(ref.fromSection.toLowerCase());
+        }
+      }
+    }
+
+    if (matchingFromSections.size > 0) {
+      const referrers = flat.filter((s) =>
+        matchingFromSections.has(s.id.toLowerCase()),
+      );
+      for (const s of referrers) {
+        mdRefs.push({ section: s, reason: 'wiki link' });
+      }
+    }
+  }
+
+  if (scope === 'code' || scope === 'md+code') {
+    const { refs: scannedRefs } = await scanCodeRefs(projectRoot);
+    for (const ref of scannedRefs) {
+      const targetLower = ref.target.toLowerCase();
+      const matches = isFileLevel
+        ? targetLower === fileLower || targetLower.startsWith(fileLower + '#')
+        : targetLower === queryLower;
+      if (matches) {
+        codeRefs.push(`${ref.file}:${ref.line}`);
+      }
+    }
+  }
+
+  return { kind: 'found', target, mdRefs, codeRefs };
+}
+
+/**
+ * Find all sections and code locations that reference a given section or
+ * source file. Accepts section ids (full-path, short-form) and source file
+ * paths (e.g. src/app.rs#foo). Source file queries match wiki links directly
+ * without section resolution.
  */
 export async function findRefs(
   ctx: CmdContext,
@@ -40,6 +180,11 @@ export async function findRefs(
   scope: Scope,
 ): Promise<RefsResult> {
   query = query.replace(/^\[\[|\]\]$/g, '');
+
+  // Source file queries bypass section resolution
+  if (isSourceQuery(query, ctx.projectRoot)) {
+    return findSourceRefs(ctx.latDir, ctx.projectRoot, query, scope);
+  }
 
   const allSections = await loadAllSections(ctx.latDir);
   const flat = flattenSections(allSections);

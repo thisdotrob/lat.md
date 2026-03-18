@@ -31,7 +31,8 @@ Output:
 2. Section content blockquoted (`>`) from `startLine` through the end of the last descendant subsection
 3. **This section references** — all wiki link targets found within the section, with body descriptions
 4. **Referenced by** — other sections in `lat.md/` that contain wiki links pointing to this section
-5. **Navigation hints** — same footer as [[cli#search]], suggesting `lat section` and `lat search` as next steps
+5. **Referenced by code** — source files containing `@lat:` comments that reference this section, each shown with file path, line number, and a 5-line snippet centered on the reference
+6. **Navigation hints** — same footer as [[cli#search]], suggesting `lat section` and `lat search` as next steps
 
 Usage: `lat section <query>`
 
@@ -39,9 +40,13 @@ Core logic in [[src/cli/section.ts#getSection]] (returns structured result), use
 
 ## refs
 
-Find sections that reference a given section via [[parser#Wiki Links]]. Outputs a [[cli#Section Preview]] for each referring section.
+Find sections that reference a given target via [[parser#Wiki Links]]. The query can be a section id or a source file path.
 
-Accepts any valid section id — short-form refs (e.g. `section-parsing#Heading`) are resolved via `findSections` when `resolveRef` doesn't produce an exact match, as long as the result is unambiguous (exact, stem-expanded, or section-name match). If no confident match exists, shows "Did you mean:" suggestions and exits.
+**Section queries** (e.g. `section-parsing#Heading`) are resolved via `findSections` when `resolveRef` doesn't produce an exact match, as long as the result is unambiguous (exact, stem-expanded, or section-name match). If no confident match exists, shows "Did you mean:" suggestions and exits.
+
+**Source file queries** (e.g. `src/app.rs#greet`, `src/app.ts`) are detected when the file part has a recognized source extension and exists on disk. File-level queries (no `#`) match all wiki links targeting that file or any symbol in it. Symbol-level queries match exactly.
+
+Outputs a [[cli#Section Preview]] for each referring section.
 
 Usage: `lat refs <query> [--scope=md|code|md+code]`
 

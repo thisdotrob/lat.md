@@ -11,8 +11,15 @@ import {
   type Section,
   type SectionMatch,
 } from '../lattice.js';
+import { scanCodeRefs } from '../code-refs.js';
 import type { CmdContext, CmdResult } from '../context.js';
 import { formatSectionId, formatNavHints } from '../format.js';
+
+export type CodeBackRef = {
+  file: string;
+  line: number;
+  snippet: string;
+};
 
 export type SectionFound = {
   kind: 'found';
@@ -20,6 +27,7 @@ export type SectionFound = {
   content: string;
   outgoingRefs: { target: string; resolved: Section }[];
   incomingRefs: SectionMatch[];
+  codeRefs: CodeBackRef[];
 };
 
 export type SectionResult =
@@ -113,7 +121,39 @@ export async function getSection(
     }
   }
 
-  return { kind: 'found', section, content, outgoingRefs, incomingRefs };
+  // Find code back-references: @lat: comments pointing to this section
+  const codeRefs: CodeBackRef[] = [];
+  const { refs: scannedRefs } = await scanCodeRefs(ctx.projectRoot);
+  for (const ref of scannedRefs) {
+    const { resolved: codeResolved } = resolveRef(
+      ref.target,
+      sectionIds,
+      fileIndex,
+    );
+    if (codeResolved.toLowerCase() === sectionId) {
+      const absFile = join(ctx.projectRoot, ref.file);
+      let snippet = '';
+      try {
+        const src = await readFile(absFile, 'utf-8');
+        const srcLines = src.split('\n');
+        const start = Math.max(0, ref.line - 1 - 2);
+        const end = Math.min(srcLines.length, ref.line - 1 + 3);
+        snippet = srcLines.slice(start, end).join('\n');
+      } catch {
+        // file unreadable — skip snippet
+      }
+      codeRefs.push({ file: ref.file, line: ref.line, snippet });
+    }
+  }
+
+  return {
+    kind: 'found',
+    section,
+    content,
+    outgoingRefs,
+    incomingRefs,
+    codeRefs,
+  };
 }
 
 function fullEndLine(section: Section): number {
@@ -133,7 +173,7 @@ export function formatSectionOutput(
   result: SectionFound,
 ): string {
   const s = ctx.styler;
-  const { section, content, outgoingRefs, incomingRefs } = result;
+  const { section, content, outgoingRefs, incomingRefs, codeRefs } = result;
   const relPath = relative(
     process.cwd(),
     join(ctx.projectRoot, section.filePath),
@@ -172,6 +212,19 @@ export function formatSectionOutput(
       parts.push(
         `${s.dim('*')} [[${formatSectionId(ref.section.id, s)}]]${body}`,
       );
+    }
+  }
+
+  if (codeRefs.length > 0) {
+    parts.push('', '## Referenced by code:', '');
+    for (const ref of codeRefs) {
+      parts.push(`${s.dim('*')} ${s.cyan(ref.file)}${s.dim(`:${ref.line}`)}`);
+      if (ref.snippet) {
+        const snippetLines = ref.snippet.split('\n');
+        for (const line of snippetLines) {
+          parts.push(`  ${s.dim('|')} ${line}`);
+        }
+      }
     }
   }
 
