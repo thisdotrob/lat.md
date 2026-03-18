@@ -1,9 +1,13 @@
-# lat.md
+<p align="center">
+  <img src="templates/logo-dark.svg" alt="lat.md" width="500">
+</p>
 
-[![CI](https://github.com/1st1/lat.md/actions/workflows/ci.yml/badge.svg)](https://github.com/1st1/lat.md/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/lat.md)](https://www.npmjs.com/package/lat.md)
+<p align="center">
+  <a href="https://github.com/1st1/lat.md/actions/workflows/ci.yml"><img src="https://github.com/1st1/lat.md/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/lat.md"><img src="https://img.shields.io/npm/v/lat.md" alt="npm"></a>
+</p>
 
-A knowledge graph for your codebase, written in markdown.
+<p align="center">A knowledge graph for your codebase, written in markdown.</p>
 
 ## The problem
 
