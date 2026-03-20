@@ -92,7 +92,7 @@ export default function Home() {
               color: '#999',
             }}
           >
-            <li>* Knowledge base (spec) that evolves in sync with your codebase</li>
+            <li>* Spec that your agent keeps in sync with the codebase</li>
             <li>* Make agents understand big ideas and key business logic</li>
             <li>* Ensure corner cases have proper high-level tests that matter</li>
             <li>* Start reviewing agent diffs: focus on knowledge, not code</li>
