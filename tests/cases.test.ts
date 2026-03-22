@@ -897,9 +897,11 @@ describe('error-source-ref-go-missing', () => {
 });
 
 describe('source-ref-c-valid', () => {
-  it('resolves C function, struct, enum, typedef, define, and variable refs without errors', async () => {
+  it('resolves C function, struct, enum, typedef, define, variable, pointer-returning, and array refs without errors', async () => {
     // docs.md links across .c and .h: greet (function), Greeter (struct),
-    // Color (enum), ErrorCode (typedef), MAX_SIZE (define), DEFAULT_NAME (variable)
+    // Color (enum), ErrorCode (typedef), MAX_SIZE (define), DEFAULT_NAME (variable),
+    // make_greeting (pointer-returning fn), split_lines (double-pointer-returning fn),
+    // version_string (array variable), CLAMP (function-like macro)
     const { errors } = await checkMd(latDir('source-ref-c-valid'));
     expect(errors).toHaveLength(0);
   });

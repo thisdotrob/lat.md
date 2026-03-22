@@ -522,8 +522,16 @@ function extractGoSymbols(tree: Tree): SourceSymbol[] {
  * Handles plain identifiers and pointer declarators (*name).
  */
 function cFuncName(declarator: SyntaxNode): string | null {
-  if (declarator.type === 'function_declarator') {
-    const inner = declarator.childForFieldName('declarator');
+  // Unwrap pointer_declarator layers (for functions returning pointers,
+  // e.g. `JSRuntime *JS_NewRuntime(void)` → pointer_declarator > function_declarator)
+  let node = declarator;
+  while (node.type === 'pointer_declarator') {
+    const child = node.childForFieldName('declarator');
+    if (!child) return null;
+    node = child;
+  }
+  if (node.type === 'function_declarator') {
+    const inner = node.childForFieldName('declarator');
     if (!inner) return null;
     if (inner.type === 'identifier') return inner.text;
     if (inner.type === 'pointer_declarator') {
@@ -548,6 +556,12 @@ function cVarName(declarator: SyntaxNode): string | null {
   let node = declarator;
   // Unwrap init_declarator to get the declarator part
   if (node.type === 'init_declarator') {
+    const inner = node.childForFieldName('declarator');
+    if (!inner) return null;
+    node = inner;
+  }
+  // Unwrap array_declarator (e.g. `char js_version[]`)
+  if (node.type === 'array_declarator') {
     const inner = node.childForFieldName('declarator');
     if (!inner) return null;
     node = inner;
@@ -640,7 +654,10 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
           signature: firstLine(node.text),
         });
       }
-    } else if (node.type === 'preproc_def') {
+    } else if (
+      node.type === 'preproc_def' ||
+      node.type === 'preproc_function_def'
+    ) {
       const name = extractName(node);
       if (name) {
         symbols.push({
