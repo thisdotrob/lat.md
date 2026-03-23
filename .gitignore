@@ -9,3 +9,5 @@ dist
 .opencode
 .agents
 .codex
+.cursor/hooks.json
+.cursor

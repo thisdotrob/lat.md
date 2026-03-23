@@ -182,11 +182,14 @@ Sets up a Pi extension that registers lat tools as native Pi tools and hooks int
 
 ### Cursor
 
-Sets up `.cursor/rules` and registers the MCP server for Cursor.
+Sets up `.cursor/rules`, a Cursor stop hook, and the MCP server for Cursor.
 
 - `.cursor/rules/lat.md` — rules file generated from `templates/cursor-rules.md`, references MCP tools instead of CLI commands
-- [[cli#mcp]] server registered in `.cursor/mcp.json` (added to `.gitignore` since it contains absolute paths)
+- `.cursor/hooks.json` — generated stop hook config (`version: 1`) that runs `lat hook cursor stop`. It enforces the end-of-task `lat check` and `lat.md/` sync reminder in Cursor's native hook format.
+- [[cli#mcp]] server registered in `.cursor/mcp.json`
 - `.agents/skills/lat-md/SKILL.md` — skill spec for authoring `lat.md/` files, placed in the cross-agent standard skills directory
+
+The `.cursor` directory is added to `.gitignore` because its hooks and MCP config may contain local paths. Cursor still relies on rules plus MCP for prompt-time search guidance because its hooks do not reliably inject prompt-specific context the way Claude/Pi integrations do.
 
 ### VS Code Copilot
 
@@ -239,7 +242,10 @@ Handle agent hook events. Called by agent hooks configured during `lat init`, no
 
 Usage: `lat hook <agent> <event>`
 
-Currently supports `claude` agent with two events:
+Currently supports:
+
+- `claude` with `UserPromptSubmit` and `Stop`
+- `cursor` with `stop`
 
 ### UserPromptSubmit
 
@@ -259,6 +265,10 @@ Conditionally blocks the agent from stopping — only when something is actually
 3. **Second pass** (`stop_hook_active` true) — if check still fails, print warning to stderr (no block, loop stops). If check passes, exit silently.
 4. **First pass** — run `git diff HEAD --numstat`. Count `codeLines` (files matching [[src/source-parser.ts#SOURCE_EXTENSIONS]]) and `latMdLines`. Skip ratio check if `codeLines < 5` or `latMdLines >= 50` (enough doc work was clearly done). Otherwise round `latMdLines` up to 1 (if nonzero) and flag `needsSync` when `latMdLines < codeLines * 5%`.
 5. **Decision** — both pass: exit silently, clean output. Check failed + needs sync: block ("update `lat.md/`, then run `lat check` until it passes"). Check failed only: block ("run `lat check` until it passes"). Needs sync only: block with explicit context ("not updated" when 0 lat.md lines, "may not be fully in sync (N lines)" when some changes exist but below ratio).
+
+### cursor stop
+
+Runs the same `lat check` and diff analysis as Claude's `Stop` hook, but emits Cursor's `followup_message` payload instead of Claude's block response so the agent continues its loop in Cursor.
 
 Implementation: [[src/cli/hook.ts]]
 

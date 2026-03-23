@@ -43,3 +43,7 @@ On the second pass, if `lat check` still fails, the hook prints a warning to std
 ## Ignores non-code files in diff
 
 Files that don't match `SOURCE_EXTENSIONS` (e.g. `.md`) are not counted toward code lines, so a large markdown-only diff does not trigger a sync reminder.
+
+## Cursor stop hook returns follow-up work instead of a Claude block
+
+When Cursor needs more work at stop time, the hook returns a `followup_message` payload instead of Claude's `decision: "block"` shape so the agent keeps going in Cursor's native hook format.

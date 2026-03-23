@@ -31,8 +31,10 @@ function makeFakeGitDir(output: string): string {
   return dir;
 }
 
-/** Run `lat hook claude Stop` against a test case dir. */
-function runStopHook(
+/** Run `lat hook <agent> <event>` against a test case dir. */
+function runHook(
+  agent: string,
+  event: string,
   caseDir: string,
   opts: {
     stopHookActive?: boolean;
@@ -50,7 +52,7 @@ function runStopHook(
     env.PATH = opts.fakeBinDir + ':' + env.PATH;
   }
 
-  const result = spawnSync('node', [cliPath, 'hook', 'claude', 'Stop'], {
+  const result = spawnSync('node', [cliPath, 'hook', agent, event], {
     cwd: caseDir,
     encoding: 'utf-8',
     input: stdinJson,
@@ -64,6 +66,17 @@ function runStopHook(
   };
 }
 
+function runStopHook(
+  agent: 'claude' | 'cursor',
+  caseDir: string,
+  opts: {
+    stopHookActive?: boolean;
+    fakeBinDir?: string;
+  } = {},
+): { stdout: string; stderr: string; exitCode: number } {
+  return runHook(agent, agent === 'claude' ? 'Stop' : 'stop', caseDir, opts);
+}
+
 const clean = join(casesDir, 'hook-clean');
 const broken = join(casesDir, 'error-broken-links');
 
@@ -72,7 +85,7 @@ describe('hook stop', () => {
   it('exits silently when check passes and no diff', () => {
     const fakeBinDir = makeFakeGitDir('');
     try {
-      const { stdout, stderr } = runStopHook(clean, { fakeBinDir });
+      const { stdout, stderr } = runStopHook('claude', clean, { fakeBinDir });
       expect(stdout).toBe('');
       expect(stderr).toBe('');
     } finally {
@@ -82,7 +95,7 @@ describe('hook stop', () => {
 
   // @lat: [[tests/hook#Blocks when lat check fails]]
   it('blocks when lat check fails', () => {
-    const { stdout } = runStopHook(broken);
+    const { stdout } = runStopHook('claude', broken);
     const parsed = JSON.parse(stdout);
     expect(parsed.decision).toBe('block');
     expect(parsed.reason).toContain('lat check');
@@ -95,7 +108,7 @@ describe('hook stop', () => {
       numstat([[80, 30, 'src/big-refactor.ts']]),
     );
     try {
-      const { stdout } = runStopHook(clean, { fakeBinDir });
+      const { stdout } = runStopHook('claude', clean, { fakeBinDir });
       const parsed = JSON.parse(stdout);
       expect(parsed.decision).toBe('block');
       expect(parsed.reason).toContain('110');
@@ -111,7 +124,7 @@ describe('hook stop', () => {
       numstat([[60, 40, 'src/feature.ts'], [8, 2, 'lat.md/feature.md']]),
     );
     try {
-      const { stdout } = runStopHook(clean, { fakeBinDir });
+      const { stdout } = runStopHook('claude', clean, { fakeBinDir });
       expect(stdout).toBe('');
     } finally {
       rmSync(fakeBinDir, { recursive: true });
@@ -122,7 +135,7 @@ describe('hook stop', () => {
   it('exits silently when code diff is below threshold', () => {
     const fakeBinDir = makeFakeGitDir(numstat([[2, 1, 'src/tiny.ts']]));
     try {
-      const { stdout } = runStopHook(clean, { fakeBinDir });
+      const { stdout } = runStopHook('claude', clean, { fakeBinDir });
       expect(stdout).toBe('');
     } finally {
       rmSync(fakeBinDir, { recursive: true });
@@ -133,7 +146,7 @@ describe('hook stop', () => {
   it('blocks with both messages when check fails and diff needs sync', () => {
     const fakeBinDir = makeFakeGitDir(numstat([[50, 60, 'src/refactor.ts']]));
     try {
-      const { stdout } = runStopHook(broken, { fakeBinDir });
+      const { stdout } = runStopHook('claude', broken, { fakeBinDir });
       const parsed = JSON.parse(stdout);
       expect(parsed.decision).toBe('block');
       expect(parsed.reason).toContain('Update `lat.md/`');
@@ -145,14 +158,18 @@ describe('hook stop', () => {
 
   // @lat: [[tests/hook#Exits silently on second pass when check passes]]
   it('exits silently on second pass when check passes', () => {
-    const { stdout, stderr } = runStopHook(clean, { stopHookActive: true });
+    const { stdout, stderr } = runStopHook('claude', clean, {
+      stopHookActive: true,
+    });
     expect(stdout).toBe('');
     expect(stderr).toBe('');
   });
 
   // @lat: [[tests/hook#Prints stderr warning on second pass when check still fails]]
   it('prints stderr warning on second pass when check still fails', () => {
-    const { stdout, stderr } = runStopHook(broken, { stopHookActive: true });
+    const { stdout, stderr } = runStopHook('claude', broken, {
+      stopHookActive: true,
+    });
     expect(stdout).toBe('');
     expect(stderr).toContain('still failing');
   });
@@ -161,8 +178,24 @@ describe('hook stop', () => {
   it('ignores non-code files in diff', () => {
     const fakeBinDir = makeFakeGitDir(numstat([[150, 50, 'README.md']]));
     try {
-      const { stdout } = runStopHook(clean, { fakeBinDir });
+      const { stdout } = runStopHook('claude', clean, { fakeBinDir });
       expect(stdout).toBe('');
+    } finally {
+      rmSync(fakeBinDir, { recursive: true });
+    }
+  });
+
+  // @lat: [[tests/hook#Cursor stop hook returns follow-up work instead of a Claude block]]
+  it('returns a Cursor follow-up message when stop needs more work', () => {
+    const fakeBinDir = makeFakeGitDir(
+      numstat([[80, 30, 'src/big-refactor.ts']]),
+    );
+    try {
+      const { stdout } = runStopHook('cursor', clean, { fakeBinDir });
+      const parsed = JSON.parse(stdout);
+      expect(parsed.followup_message).toContain('lat.md/');
+      expect(parsed.followup_message).toContain('110');
+      expect(parsed.decision).toBeUndefined();
     } finally {
       rmSync(fakeBinDir, { recursive: true });
     }

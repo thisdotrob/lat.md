@@ -9,7 +9,7 @@ import { getLlmKey } from '../config.js';
 import { checkMd, checkCodeRefs, checkIndex, checkSections } from './check.js';
 import { SOURCE_EXTENSIONS } from '../source-parser.js';
 
-function outputPromptSubmit(context: string): void {
+function outputClaudePromptSubmit(context: string): void {
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -20,11 +20,19 @@ function outputPromptSubmit(context: string): void {
   );
 }
 
-function outputStop(reason: string): void {
+function outputClaudeStop(reason: string): void {
   process.stdout.write(
     JSON.stringify({
       decision: 'block',
       reason,
+    }),
+  );
+}
+
+function outputCursorStop(reason: string): void {
+  process.stdout.write(
+    JSON.stringify({
+      followup_message: reason,
     }),
   );
 }
@@ -141,7 +149,7 @@ async function handleUserPromptSubmit(): Promise<void> {
     }
   }
 
-  outputPromptSubmit(parts.join('\n'));
+  outputClaudePromptSubmit(parts.join('\n'));
 }
 
 /** Minimum diff size (in lines) to consider "significant" code change. */
@@ -190,21 +198,15 @@ function analyzeDiff(projectRoot: string): {
   return { codeLines, latMdLines };
 }
 
-async function handleStop(): Promise<void> {
-  const latDir = findLatticeDir();
-  if (!latDir) return;
+type StopStatus = {
+  checkFailed: boolean;
+  totalErrors: number;
+  needsSync: boolean;
+  codeLines: number;
+  latMdLines: number;
+};
 
-  // Read stdin to check if we already blocked once
-  let stopHookActive = false;
-  try {
-    const raw = await readStdin();
-    const input = JSON.parse(raw);
-    stopHookActive = input.stop_hook_active ?? false;
-  } catch {
-    // If we can't parse stdin, treat as first attempt
-  }
-
-  // Always run lat check — even on second pass
+async function getStopStatus(latDir: string): Promise<StopStatus> {
   const md = await checkMd(latDir);
   const code = await checkCodeRefs(latDir);
   const indexErrors = await checkIndex(latDir);
@@ -216,29 +218,31 @@ async function handleStop(): Promise<void> {
     sectionErrors.length;
   const checkFailed = totalErrors > 0;
 
-  // Second pass — warn the user but don't block again
-  if (stopHookActive) {
-    if (checkFailed) {
-      console.error(
-        `lat check is still failing (${totalErrors} error(s)). Run \`lat check\` to see details.`,
-      );
-    }
-    return;
-  }
-
   const projectRoot = dirname(latDir);
-
-  // Analyze git diff — flag when lat.md/ changes are < 5% of code changes
   const { codeLines, latMdLines } = analyzeDiff(projectRoot);
   let needsSync = false;
   if (codeLines >= DIFF_THRESHOLD && latMdLines < LATMD_UPPER_THRESHOLD) {
-    // Round up lat.md lines to 1 if nonzero (a tiny touch still counts)
     const effectiveLatMd = latMdLines === 0 ? 0 : Math.max(latMdLines, 1);
     needsSync = effectiveLatMd < codeLines * LATMD_RATIO;
   }
 
-  // Nothing to do — let the agent stop cleanly
-  if (!checkFailed && !needsSync) return;
+  return {
+    checkFailed,
+    totalErrors,
+    needsSync,
+    codeLines,
+    latMdLines,
+  };
+}
+
+function formatStopReason({
+  checkFailed,
+  totalErrors,
+  needsSync,
+  codeLines,
+  latMdLines,
+}: StopStatus): string | null {
+  if (!checkFailed && !needsSync) return null;
 
   const parts: string[] = [];
 
@@ -273,26 +277,78 @@ async function handleStop(): Promise<void> {
     );
   }
 
-  outputStop(parts.join('\n'));
+  return parts.join('\n');
+}
+
+async function handleClaudeStop(): Promise<void> {
+  const latDir = findLatticeDir();
+  if (!latDir) return;
+
+  // Read stdin to check if we already blocked once
+  let stopHookActive = false;
+  try {
+    const raw = await readStdin();
+    const input = JSON.parse(raw);
+    stopHookActive = input.stop_hook_active ?? false;
+  } catch {
+    // If we can't parse stdin, treat as first attempt
+  }
+
+  const status = await getStopStatus(latDir);
+
+  // Second pass — warn the user but don't block again
+  if (stopHookActive) {
+    if (status.checkFailed) {
+      console.error(
+        `lat check is still failing (${status.totalErrors} error(s)). Run \`lat check\` to see details.`,
+      );
+    }
+    return;
+  }
+
+  const reason = formatStopReason(status);
+  if (!reason) return;
+  outputClaudeStop(reason);
+}
+
+async function handleCursorStop(): Promise<void> {
+  const latDir = findLatticeDir();
+  if (!latDir) return;
+
+  const reason = formatStopReason(await getStopStatus(latDir));
+  if (!reason) return;
+  outputCursorStop(reason);
 }
 
 export async function hookCmd(agent: string, event: string): Promise<void> {
-  if (agent !== 'claude') {
-    console.error(`Unknown agent: ${agent}. Supported: claude`);
-    process.exit(1);
-  }
-
-  switch (event) {
-    case 'UserPromptSubmit':
-      await handleUserPromptSubmit();
-      break;
-    case 'Stop':
-      await handleStop();
-      break;
+  switch (agent) {
+    case 'claude':
+      switch (event) {
+        case 'UserPromptSubmit':
+          await handleUserPromptSubmit();
+          return;
+        case 'Stop':
+          await handleClaudeStop();
+          return;
+        default:
+          console.error(
+            `Unknown hook event for claude: ${event}. Supported: UserPromptSubmit, Stop`,
+          );
+          process.exit(1);
+      }
+    case 'cursor':
+      switch (event) {
+        case 'stop':
+          await handleCursorStop();
+          return;
+        default:
+          console.error(
+            `Unknown hook event for cursor: ${event}. Supported: stop`,
+          );
+          process.exit(1);
+      }
     default:
-      console.error(
-        `Unknown hook event: ${event}. Supported: UserPromptSubmit, Stop`,
-      );
+      console.error(`Unknown agent: ${agent}. Supported: claude, cursor`);
       process.exit(1);
   }
 }

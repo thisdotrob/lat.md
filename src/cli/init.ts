@@ -141,8 +141,12 @@ function styledMcpCommand(style: LatCommandStyle): {
 // ── Claude Code helpers ──────────────────────────────────────────────
 
 /** Derive the hook command prefix for the given command style. */
-function latHookCommand(style: LatCommandStyle, event: string): string {
-  return `${latBinString(style)} hook claude ${event}`;
+function latHookCommand(
+  style: LatCommandStyle,
+  agent: 'claude' | 'cursor',
+  event: string,
+): string {
+  return `${latBinString(style)} hook ${agent} ${event}`;
 }
 
 type HookEntry = { hooks?: { type?: string; command?: string }[] };
@@ -200,11 +204,28 @@ function syncLatHooks(settingsPath: string, style: LatCommandStyle): void {
       hooks[event] = [];
     }
     (hooks[event] as unknown[]).push({
-      hooks: [{ type: 'command', command: latHookCommand(style, event) }],
+      hooks: [
+        { type: 'command', command: latHookCommand(style, 'claude', event) },
+      ],
     });
   }
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+}
+
+function cursorHooksTemplate(style: LatCommandStyle): string {
+  return (
+    JSON.stringify(
+      {
+        version: 1,
+        hooks: {
+          stop: [{ command: latHookCommand(style, 'cursor', 'stop') }],
+        },
+      },
+      null,
+      2,
+    ) + '\n'
+  );
 }
 
 // ── Gitignore helper ─────────────────────────────────────────────────
@@ -402,7 +423,7 @@ async function writeTemplateFile(
   latDir: string,
   relPath: string,
   template: string,
-  genTarget: string,
+  genTarget: string | null,
   label: string,
   indent: string,
   ask: (message: string) => Promise<boolean>,
@@ -447,10 +468,15 @@ async function writeTemplateFile(
   }
 
   console.log(
-    chalk.dim(`${indent}Kept existing file.`) +
-      ' Run ' +
-      chalk.cyan(`lat gen ${genTarget}`) +
-      ' to see the latest template.',
+    genTarget
+      ? chalk.dim(`${indent}Kept existing file.`) +
+          ' Run ' +
+          chalk.cyan(`lat gen ${genTarget}`) +
+          ' to see the latest template.'
+      : chalk.dim(`${indent}Kept existing file.`) +
+          ' Re-run ' +
+          chalk.cyan('lat init') +
+          ' to regenerate this file.',
   );
   return null;
 }
@@ -612,6 +638,31 @@ async function setupCursor(
   );
   if (hash) hashes['.cursor/rules/lat.md'] = hash;
 
+  // .cursor/hooks.json
+  console.log('');
+  console.log(
+    chalk.dim(
+      '  Cursor hooks can enforce the lat.md/ stop check, while prompt guidance',
+    ),
+  );
+  console.log(
+    chalk.dim(
+      '  stays in rules + MCP because Cursor cannot reliably inject prompt-specific context.',
+    ),
+  );
+
+  const hooksHash = await writeTemplateFile(
+    root,
+    latDir,
+    '.cursor/hooks.json',
+    cursorHooksTemplate(style),
+    null,
+    'Hooks (.cursor/hooks.json)',
+    '  ',
+    ask,
+  );
+  if (hooksHash) hashes['.cursor/hooks.json'] = hooksHash;
+
   // .cursor/mcp.json
   console.log('');
   console.log(
@@ -635,8 +686,8 @@ async function setupCursor(
     );
   }
 
-  // Ensure .cursor/mcp.json is gitignored (it contains local absolute paths)
-  ensureGitignored(root, '.cursor/mcp.json');
+  // Ensure .cursor is gitignored (hooks and MCP config may contain local paths)
+  ensureGitignored(root, '.cursor');
 
   // .agents/skills/lat-md/SKILL.md — skill for authoring lat.md files
   await writeAgentsSkill(root, latDir, hashes, ask);
