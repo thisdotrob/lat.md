@@ -6,3 +6,5 @@ dist
 .cursor/mcp.json
 .claude
 .pi
+.opencode
+.agents

@@ -14,6 +14,10 @@ export function readPiExtensionTemplate(): string {
   return readFileSync(join(findTemplatesDir(), 'pi-extension.ts'), 'utf-8');
 }
 
+export function readOpenCodePluginTemplate(): string {
+  return readFileSync(join(findTemplatesDir(), 'opencode-plugin.ts'), 'utf-8');
+}
+
 export function readSkillTemplate(): string {
   return readFileSync(join(findTemplatesDir(), 'skill', 'SKILL.md'), 'utf-8');
 }
@@ -31,12 +35,15 @@ export async function genCmd(target: string): Promise<void> {
     case 'pi-extension.ts':
       process.stdout.write(readPiExtensionTemplate());
       break;
+    case 'opencode-plugin.ts':
+      process.stdout.write(readOpenCodePluginTemplate());
+      break;
     case 'skill.md':
       process.stdout.write(readSkillTemplate());
       break;
     default:
       console.error(
-        `Unknown target: ${target}. Supported: agents.md, claude.md, cursor-rules.md, pi-extension.ts, skill.md`,
+        `Unknown target: ${target}. Supported: agents.md, claude.md, cursor-rules.md, pi-extension.ts, opencode-plugin.ts, skill.md`,
       );
       process.exit(1);
   }

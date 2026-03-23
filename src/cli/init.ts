@@ -14,6 +14,7 @@ import {
   readAgentsTemplate,
   readCursorRulesTemplate,
   readPiExtensionTemplate,
+  readOpenCodePluginTemplate,
   readSkillTemplate,
 } from './gen.js';
 import {
@@ -710,6 +711,53 @@ async function setupPi(
   ensureGitignored(root, '.pi');
 }
 
+async function setupOpenCode(
+  root: string,
+  latDir: string,
+  hashes: Record<string, string>,
+  ask: (message: string) => Promise<boolean>,
+  style: LatCommandStyle,
+): Promise<void> {
+  // AGENTS.md — OpenCode reads this natively
+  // (already created in the shared step if any non-Claude agent is selected)
+
+  // .opencode/plugins/lat.ts — plugin that registers tools + lifecycle hooks
+  console.log('');
+  console.log(
+    chalk.dim(
+      '  The OpenCode plugin registers lat tools and hooks into the session',
+    ),
+  );
+  console.log(
+    chalk.dim(
+      '  lifecycle to validate lat.md/ when the agent finishes.',
+    ),
+  );
+
+  const template = readOpenCodePluginTemplate().replace(
+    '__LAT_BIN__',
+    latBinString(style),
+  );
+
+  const hash = await writeTemplateFile(
+    root,
+    latDir,
+    '.opencode/plugins/lat.ts',
+    template,
+    'opencode-plugin.ts',
+    'Plugin (.opencode/plugins/lat.ts)',
+    '  ',
+    ask,
+  );
+  if (hash) hashes['.opencode/plugins/lat.ts'] = hash;
+
+  // .agents/skills/lat-md/SKILL.md — skill for authoring lat.md files
+  await writeAgentsSkill(root, latDir, hashes, ask);
+
+  // Ensure .opencode is gitignored (plugin contains local absolute paths)
+  ensureGitignored(root, '.opencode');
+}
+
 // ── LLM key setup ───────────────────────────────────────────────────
 
 async function setupLlmKey(
@@ -894,7 +942,8 @@ export async function initCmd(targetDir?: string): Promise<void> {
       { label: 'Pi', value: 'pi' },
       { label: 'Cursor', value: 'cursor' },
       { label: 'VS Code Copilot', value: 'copilot' },
-      { label: 'Codex / OpenCode', value: 'codex' },
+      { label: 'OpenCode', value: 'opencode' },
+      { label: 'Codex', value: 'codex' },
     ];
 
     const selectedAgents: string[] = [];
@@ -933,10 +982,12 @@ export async function initCmd(targetDir?: string): Promise<void> {
     const usePi = selectedAgents.includes('pi');
     const useCursor = selectedAgents.includes('cursor');
     const useCopilot = selectedAgents.includes('copilot');
+    const useOpenCode = selectedAgents.includes('opencode');
     const useCodex = selectedAgents.includes('codex');
 
     const anySelected = selectedAgents.length > 0;
-    const needsLatCommand = useClaudeCode || usePi || useCursor || useCopilot;
+    const needsLatCommand =
+      useClaudeCode || usePi || useCursor || useCopilot || useOpenCode;
 
     // Step 2b: How should agents run lat?
     let commandStyle: LatCommandStyle = 'local';
@@ -984,7 +1035,8 @@ export async function initCmd(targetDir?: string): Promise<void> {
     const fileHashes: Record<string, string> = {};
 
     // Step 3: AGENTS.md (shared by non-Claude agents)
-    const needsAgentsMd = usePi || useCursor || useCopilot || useCodex;
+    const needsAgentsMd =
+      usePi || useCursor || useCopilot || useOpenCode || useCodex;
     if (needsAgentsMd) {
       await setupAgentsMd(root, latDir, template, fileHashes, ask);
     }
@@ -1021,9 +1073,15 @@ export async function initCmd(targetDir?: string): Promise<void> {
       await setupCopilot(root, latDir, fileHashes, ask, commandStyle);
     }
 
+    if (useOpenCode) {
+      console.log('');
+      console.log(chalk.bold('Setting up OpenCode...'));
+      await setupOpenCode(root, latDir, fileHashes, ask, commandStyle);
+    }
+
     if (useCodex) {
       console.log('');
-      console.log(chalk.bold('Setting up Codex / OpenCode...'));
+      console.log(chalk.bold('Setting up Codex...'));
       console.log(chalk.dim('  Uses AGENTS.md (already created).'));
       await writeAgentsSkill(root, latDir, fileHashes, ask);
     }
