@@ -6,7 +6,15 @@ The [[src/app.h#Greeter]] struct is defined in the header.
 
 Colors: [[src/app.h#Color]].
 
+Named enum value: [[src/app.h#GREEN]].
+
 Typedef: [[src/app.h#ErrorCode]].
+
+Anonymous enum value: [[src/app.h#JS_TAG_INT]].
+
+Typedef-enum value: [[src/app.h#JS_GC_OBJ_TYPE_FUNCTION_BYTECODE]].
+
+Named typedef-enum value: [[src/app.h#JS_PROMISE_PENDING]].
 
 Max size: [[src/app.h#MAX_SIZE]].
 

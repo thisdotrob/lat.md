@@ -2,6 +2,7 @@
 lat:
   require-code-mention: true
 ---
+
 # Check MD
 
 Tests for validating wiki links in `lat.md/` markdown files.
@@ -13,3 +14,7 @@ Given a file with a wiki link pointing to a nonexistent section, [[cli#check#md]
 ## Passes with valid links
 
 Given files where all wiki links resolve to existing sections, [[cli#check#md]] should report no errors.
+
+### Passes with C enum value links
+
+Given `lat.md` links to C enum members, including anonymous enums and `typedef enum` members, [[cli#check#md]] should resolve those values as valid source symbols.

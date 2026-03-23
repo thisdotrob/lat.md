@@ -634,6 +634,7 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
           signature: firstLine(node.text),
         });
       }
+      collectCEnumMembers(node, symbols);
     } else if (node.type === 'type_definition') {
       let declarator = node.childForFieldName('declarator');
       // Unwrap pointer_declarator for pointer typedefs
@@ -651,6 +652,11 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
           endLine,
           signature: firstLine(node.text),
         });
+      }
+      for (const child of node.namedChildren) {
+        if (child.type === 'enum_specifier') {
+          collectCEnumMembers(child, symbols);
+        }
       }
     } else if (node.type === 'declaration') {
       const declarator = node.childForFieldName('declarator');
@@ -708,6 +714,27 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
       collectCNodes(node, symbols);
     } else if (node.type === 'preproc_else' || node.type === 'preproc_elif') {
       // Skip else/elif branches of preprocessor conditionals.
+    }
+  }
+}
+
+function collectCEnumMembers(
+  enumSpecifier: SyntaxNode,
+  symbols: SourceSymbol[],
+): void {
+  for (const child of enumSpecifier.namedChildren) {
+    if (child.type !== 'enumerator_list') continue;
+    for (const enumerator of child.namedChildren) {
+      if (enumerator.type !== 'enumerator') continue;
+      const name = extractName(enumerator);
+      if (!name) continue;
+      symbols.push({
+        name,
+        kind: 'const',
+        startLine: enumerator.startPosition.row + 1,
+        endLine: enumerator.endPosition.row + 1,
+        signature: firstLine(enumerator.text),
+      });
     }
   }
 }
