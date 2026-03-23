@@ -172,11 +172,11 @@ export default function Home() {
             }}
           >
             {[
+              { v: '0.11', text: <><Cmd>lat init</Cmd> supports Codex, OpenCode, and Cursor stop hook; C enum value and struct field linking including anonymous unions</> },
               { v: '0.10', text: <><Cmd>lat section</Cmd> and <Cmd>lat refs</Cmd> show source code snippets; ripgrep-powered code scanning</> },
               { v: '0.9', text: <><Cmd>lat init</Cmd> creates a lat skill for supported agents</> },
               { v: '0.8', text: <>Pi coding agent integration; interactive arrow-key menus in <Cmd>lat init</Cmd></> },
               { v: '0.7', text: <>Multi-language source links (Rust, Go, C); <Cmd>lat section</Cmd> and <Cmd>lat expand</Cmd> commands; section structure validation</> },
-              { v: '0.6', text: <>Source code wiki links — reference functions and classes directly from specs: <Cmd>{'[[src/foo.ts#myFunc]]'}</Cmd></> },
             ].slice(0, 5).map(({ v, text }, i, arr) => {
               const t = 1 - i / (arr.length - 1 || 1)
               const c = Math.round(80 + 73 * t)
