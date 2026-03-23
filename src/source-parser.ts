@@ -622,6 +622,7 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
           endLine,
           signature: firstLine(node.text),
         });
+        collectCStructFields(node, name, symbols);
       }
     } else if (node.type === 'enum_specifier') {
       const name = extractName(node);
@@ -656,6 +657,8 @@ function collectCNodes(parent: SyntaxNode, symbols: SourceSymbol[]): void {
       for (const child of node.namedChildren) {
         if (child.type === 'enum_specifier') {
           collectCEnumMembers(child, symbols);
+        } else if (child.type === 'struct_specifier' && name) {
+          collectCStructFields(child, name, symbols);
         }
       }
     } else if (node.type === 'declaration') {
@@ -737,6 +740,59 @@ function collectCEnumMembers(
       });
     }
   }
+}
+
+/**
+ * Extract struct field/member names from a struct_specifier and emit
+ * them as symbols with `parent` set to the struct name.
+ * Handles plain identifiers, pointers, arrays, and bitfields.
+ */
+function collectCStructFields(
+  structNode: SyntaxNode,
+  structName: string,
+  symbols: SourceSymbol[],
+): void {
+  for (const child of structNode.namedChildren) {
+    if (child.type !== 'field_declaration_list') continue;
+    for (const field of child.namedChildren) {
+      if (field.type !== 'field_declaration') continue;
+      const declarator = field.childForFieldName('declarator');
+      if (!declarator) continue;
+      const name = cFieldName(declarator);
+      if (!name) continue;
+      symbols.push({
+        name,
+        kind: 'variable',
+        parent: structName,
+        startLine: field.startPosition.row + 1,
+        endLine: field.endPosition.row + 1,
+        signature: firstLine(field.text),
+      });
+    }
+  }
+}
+
+/**
+ * Extract the field name from a C struct field declarator.
+ * Handles field_identifier, pointer_declarator, array_declarator,
+ * and bitfield_clause (e.g. `uint8_t extensible : 1`).
+ */
+function cFieldName(declarator: SyntaxNode): string | null {
+  let node = declarator;
+  // Unwrap pointer_declarator layers (e.g. `JSShape *shape`)
+  while (node.type === 'pointer_declarator') {
+    const child = node.childForFieldName('declarator');
+    if (!child) return null;
+    node = child;
+  }
+  // Unwrap array_declarator (e.g. `char name[32]`)
+  if (node.type === 'array_declarator') {
+    const inner = node.childForFieldName('declarator');
+    if (!inner) return null;
+    node = inner;
+  }
+  if (node.type === 'field_identifier') return node.text;
+  return null;
 }
 
 function firstLine(text: string): string {

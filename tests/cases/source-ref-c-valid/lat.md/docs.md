@@ -33,3 +33,7 @@ Pointer typedef: [[src/app.h#AppCtx]].
 Extern C function: [[src/app.h#greet]].
 
 Preproc-if function: [[src/app.h#extra_func]].
+
+Struct field (pointer): [[src/app.h#Greeter#prefix]].
+
+Struct field (plain): [[src/app.h#Greeter#count]].

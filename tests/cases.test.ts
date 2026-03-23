@@ -902,8 +902,9 @@ describe('error-source-ref-go-missing', () => {
 
 describe('source-ref-c-valid', () => {
   // @lat: [[tests/check-md#Passes with valid links#Passes with C enum value links]]
-  it('resolves C function, struct, enum, typedef, define, variable, pointer-returning, and array refs without errors', async () => {
+  it('resolves C function, struct, struct field, enum, typedef, define, variable, pointer-returning, and array refs without errors', async () => {
     // docs.md links across .c and .h: greet (function), Greeter (struct),
+    // Greeter#prefix / Greeter#count (struct fields),
     // Color (enum), GREEN / JS_TAG_INT / JS_GC_OBJ_TYPE_FUNCTION_BYTECODE /
     // JS_PROMISE_PENDING (enum values), ErrorCode (typedef), MAX_SIZE (define), DEFAULT_NAME (variable),
     // make_greeting (pointer-returning fn), split_lines (double-pointer-returning fn),
@@ -916,7 +917,7 @@ describe('source-ref-c-valid', () => {
 describe('error-source-ref-c-missing', () => {
   it('check md reports all missing C symbols', async () => {
     const { errors } = await checkMd(latDir('error-source-ref-c-missing'));
-    expect(errors).toHaveLength(4);
+    expect(errors).toHaveLength(5);
 
     const byTarget = new Map(errors.map((e) => [e.target, e]));
 
@@ -935,6 +936,10 @@ describe('error-source-ref-c-missing', () => {
     const v = byTarget.get('src/app.c#MISSING_VAR')!;
     expect(v).toBeDefined();
     expect(v.message).toContain('symbol "MISSING_VAR" not found');
+
+    const field = byTarget.get('src/app.c#Greeter#nonexistent')!;
+    expect(field).toBeDefined();
+    expect(field.message).toContain('symbol "Greeter#nonexistent" not found');
   });
 });
 
@@ -1138,17 +1143,28 @@ describe('getSection', () => {
     });
   });
 
-  it('C: outgoingSourceRefs include endLine for struct, function, macro', async () => {
+  // @lat: [[tests/check-md#Passes with valid links#Passes with C struct field links]]
+  it('C: outgoingSourceRefs include endLine for struct, struct field, function, macro', async () => {
     const ctx = testCtx('source-ref-c-valid');
     const result = await getSection(ctx, 'lat.md/docs#Docs');
     expect(result.kind).toBe('found');
     if (result.kind !== 'found') return;
     const ref = (t: string) =>
       result.outgoingSourceRefs.find((r) => r.target === t);
-    // struct in header: lines 4-6
-    expect(ref('src/app.h#Greeter')).toMatchObject({ line: 4, endLine: 6 });
-    // enum: line 8
-    expect(ref('src/app.h#Color')).toMatchObject({ line: 8, endLine: 8 });
+    // struct in header: lines 4-7 (added count field)
+    expect(ref('src/app.h#Greeter')).toMatchObject({ line: 4, endLine: 7 });
+    // struct field: pointer member (line 5)
+    expect(ref('src/app.h#Greeter#prefix')).toMatchObject({
+      line: 5,
+      endLine: 5,
+    });
+    // struct field: plain member (line 6)
+    expect(ref('src/app.h#Greeter#count')).toMatchObject({
+      line: 6,
+      endLine: 6,
+    });
+    // enum: line 9
+    expect(ref('src/app.h#Color')).toMatchObject({ line: 9, endLine: 9 });
     // function in .c: lines 4-6
     expect(ref('src/app.c#greet')).toMatchObject({ line: 4, endLine: 6 });
     // multi-line function: lines 15-17

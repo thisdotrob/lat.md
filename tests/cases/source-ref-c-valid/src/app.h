@@ -3,6 +3,7 @@
 
 struct Greeter {
     char *prefix;
+    int count;
 };
 
 enum Color { RED, GREEN, BLUE };

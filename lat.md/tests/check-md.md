@@ -18,3 +18,7 @@ Given files where all wiki links resolve to existing sections, [[cli#check#md]] 
 ### Passes with C enum value links
 
 Given `lat.md` links to C enum members, including anonymous enums and `typedef enum` members, [[cli#check#md]] should resolve those values as valid source symbols.
+
+### Passes with C struct field links
+
+Given `lat.md` links to C struct fields using `[[file.h#Struct#field]]` syntax, [[cli#check#md]] should resolve those fields as valid source symbols. Covers pointer fields, plain fields, and fields in typedef'd structs.

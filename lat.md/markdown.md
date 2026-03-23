@@ -39,6 +39,7 @@ Wiki links can reference symbols in TypeScript, JavaScript, Python, Rust, Go, an
 - **`[[src/lib.rs#Greeter#greet]]`** — the `greet` method on struct `Greeter` in Rust
 - **`[[src/app.go#Greeter#Greet]]`** — the `Greet` method on type `Greeter` in Go
 - **`[[src/app.h#Greeter]]`** — the `Greeter` struct in a C header
+- **`[[src/app.h#Greeter#prefix]]`** — the `prefix` field of struct `Greeter` in C
 - **`[[src/config.ts]]`** — link to the file itself (no symbol)
 
 Supported extensions: `.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.rs`, `.go`, `.c`, `.h`.
@@ -49,7 +50,7 @@ Rust symbols: functions, structs, enums, traits, impl methods, consts, statics, 
 
 Go symbols: functions, types (structs, interfaces, type aliases), methods (with receiver), consts, vars. Methods are resolved via receiver type — `[[file.go#Type#Method]]` matches `func (t *Type) Method()`.
 
-C symbols: functions (including pointer-returning like `char *func()`), structs, enums, enum values (including anonymous enums and `typedef enum` members), typedefs, `#define` macros (both object-like and function-like), variables (including arrays). Both `.c` and `.h` files are supported — include guards (`#ifndef`/`#endif`) are walked through transparently.
+C symbols: functions (including pointer-returning like `char *func()`), structs, struct fields/members, enums, enum values (including anonymous enums and `typedef enum` members), typedefs, `#define` macros (both object-like and function-like), variables (including arrays). Struct fields are resolved via the parent struct — `[[file.h#Struct#field]]` matches any `field_declaration` inside `struct Struct { ... }`. Both `.c` and `.h` files are supported — include guards (`#ifndef`/`#endif`) are walked through transparently.
 
 Source code is parsed lazily with tree-sitter (via `web-tree-sitter`). Only files referenced by wiki links are parsed — no up-front scanning. [[cli#check#md]] validates that the file exists and the symbol is defined.
 
