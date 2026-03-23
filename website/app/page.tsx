@@ -177,7 +177,9 @@ export default function Home() {
               { v: '0.9', text: <><Cmd>lat init</Cmd> creates a lat skill for supported agents</> },
               { v: '0.8', text: <>Pi coding agent integration; interactive arrow-key menus in <Cmd>lat init</Cmd></> },
               { v: '0.7', text: <>Multi-language source links (Rust, Go, C); <Cmd>lat section</Cmd> and <Cmd>lat expand</Cmd> commands; section structure validation</> },
-            ].slice(0, 5).map(({ v, text }, i, arr) => {
+              { v: '0.6', text: <>Source code wiki links — reference functions and classes directly from specs: <Cmd>{'[[src/foo.ts#myFunc]]'}</Cmd></> },
+              { v: '0.5', text: <>Auto-suggest <Cmd>lat init</Cmd> when no <Cmd>lat.md/</Cmd> found; section IDs now include h1 heading</> },
+            ].slice(0, 7).map(({ v, text }, i, arr) => {
               const t = 1 - i / (arr.length - 1 || 1)
               const c = Math.round(80 + 73 * t)
               const textColor = `rgb(${c}, ${c}, ${c})`

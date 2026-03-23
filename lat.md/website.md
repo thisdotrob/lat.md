@@ -8,4 +8,4 @@ Completely separate from the npm package — has its own `package.json`, `tsconf
 
 Black page with centered vector logo (`website/public/logo.svg`) generated from Menlo font glyphs. Scales to match content width.
 
-Includes a "What's New" changelog showing only the 5 most recent versions. Text-brightness gradient fades older entries darker. When adding a new version, drop the oldest entry to keep the count at 5.
+Includes a "What's New" changelog showing only the 7 most recent versions. Text-brightness gradient fades older entries darker. When adding a new version, drop the oldest entry to keep the count at 7.
