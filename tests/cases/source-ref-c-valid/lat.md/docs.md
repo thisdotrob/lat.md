@@ -43,3 +43,7 @@ Named enum value (qualified): [[src/app.h#Color#GREEN]].
 Typedef-enum value (qualified): [[src/app.h#JSGCObjectTypeEnum#JS_GC_OBJ_TYPE_FUNCTION_BYTECODE]].
 
 Named typedef-enum value (qualified): [[src/app.h#JSPromiseStateEnum#JS_PROMISE_PENDING]].
+
+Anonymous union bitfield: [[src/app.h#JSObject#is_exotic]].
+
+Anonymous union plain field: [[src/app.h#JSObject#flags]].

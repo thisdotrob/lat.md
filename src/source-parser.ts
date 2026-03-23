@@ -756,7 +756,8 @@ function collectCEnumMembers(
 /**
  * Extract struct field/member names from a struct_specifier and emit
  * them as symbols with `parent` set to the struct name.
- * Handles plain identifiers, pointers, arrays, and bitfields.
+ * Handles plain identifiers, pointers, arrays, bitfields, and
+ * anonymous union/struct members (recurses into them).
  */
 function collectCStructFields(
   structNode: SyntaxNode,
@@ -765,10 +766,19 @@ function collectCStructFields(
 ): void {
   for (const child of structNode.namedChildren) {
     if (child.type !== 'field_declaration_list') continue;
-    for (const field of child.namedChildren) {
-      if (field.type !== 'field_declaration') continue;
-      const declarator = field.childForFieldName('declarator');
-      if (!declarator) continue;
+    collectFieldsFromList(child, structName, symbols);
+  }
+}
+
+function collectFieldsFromList(
+  fieldList: SyntaxNode,
+  structName: string,
+  symbols: SourceSymbol[],
+): void {
+  for (const field of fieldList.namedChildren) {
+    if (field.type !== 'field_declaration') continue;
+    const declarator = field.childForFieldName('declarator');
+    if (declarator) {
       const name = cFieldName(declarator);
       if (!name) continue;
       symbols.push({
@@ -779,6 +789,21 @@ function collectCStructFields(
         endLine: field.endPosition.row + 1,
         signature: firstLine(field.text),
       });
+    } else {
+      // Anonymous union/struct member — recurse into its field list
+      for (const inner of field.namedChildren) {
+        if (
+          (inner.type === 'union_specifier' ||
+            inner.type === 'struct_specifier') &&
+          !extractName(inner)
+        ) {
+          for (const sub of inner.namedChildren) {
+            if (sub.type === 'field_declaration_list') {
+              collectFieldsFromList(sub, structName, symbols);
+            }
+          }
+        }
+      }
     }
   }
 }
