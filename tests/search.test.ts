@@ -17,22 +17,33 @@ import type { Server } from 'node:http';
 
 // @lat: [[search#Provider Detection]]
 describe('detectProvider', () => {
-  it('detects OpenAI key', () => {
-    const p = detectProvider('sk-abc123');
-    expect(p.name).toBe('openai');
+  it('detects Bedrock ARN', () => {
+    const p = detectProvider(
+      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/jnja40wjqasa',
+    );
+    expect(p.name).toBe('bedrock');
+    expect(p.dimensions).toBe(1024);
+    expect(p.model).toBe(
+      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/jnja40wjqasa',
+    );
+    expect(p.region).toBe('us-east-1');
   });
 
-  it('detects Vercel key', () => {
-    const p = detectProvider('vck_abc123');
-    expect(p.name).toBe('vercel');
+  it('extracts region from Bedrock ARN', () => {
+    const p = detectProvider(
+      'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/abc',
+    );
+    expect(p.region).toBe('eu-west-1');
   });
 
-  it('rejects Anthropic key with helpful message', () => {
-    expect(() => detectProvider('sk-ant-abc123')).toThrow(/Anthropic/);
+  it('rejects malformed Bedrock ARN', () => {
+    expect(() => detectProvider('arn:aws:bedrock:')).toThrow(
+      /Cannot parse AWS region/,
+    );
   });
 
-  it('rejects unknown key', () => {
-    expect(() => detectProvider('xyz_abc123')).toThrow(/Unrecognized/);
+  it('rejects unknown key format', () => {
+    expect(() => detectProvider('sk-abc123')).toThrow(/Unrecognized/);
   });
 });
 
@@ -72,14 +83,14 @@ describe.skipIf(!canRun)('search (rag)', () => {
       });
       server = replay.server;
       flushCapture = replay.flush;
-      replayKey = `REPLAY_LAT_LLM_KEY::${replay.url}`;
+      replayKey = `REPLAY_LAT_LLM_KEY::${replay.dimensions}::${replay.url}`;
       provider = detectProvider(replayKey);
     } else {
       // Replay mode: serve cached vectors
       const replay = await startReplayServer(replayDir);
       server = replay.server;
       flushCapture = replay.flush;
-      replayKey = `REPLAY_LAT_LLM_KEY::${replay.url}`;
+      replayKey = `REPLAY_LAT_LLM_KEY::${replay.dimensions}::${replay.url}`;
       provider = detectProvider(replayKey);
     }
 

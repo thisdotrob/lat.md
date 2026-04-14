@@ -1099,7 +1099,7 @@ async function setupLlmKey(
     '  relevant documentation by meaning, not just keywords. This requires an',
   );
   console.log(
-    '  embedding API key (OpenAI or Vercel AI Gateway). Without it, agents can still',
+    '  AWS Bedrock ARN for an embedding model. Without it, agents can still',
   );
   console.log(
     '  use ' +
@@ -1120,20 +1120,18 @@ async function setupLlmKey(
   }
 
   console.log(
-    '  You can provide a key now, or skip and set ' +
+    '  You can provide an ARN now, or skip and set ' +
       styleText('cyan', 'LAT_LLM_KEY') +
       ' env var later.',
   );
   console.log(
-    '  Supported: OpenAI (' +
-      styleText('dim', 'sk-...') +
-      ') or Vercel AI Gateway (' +
-      styleText('dim', 'vck_...') +
+    '  Supported: AWS Bedrock ARN (' +
+      styleText('dim', 'arn:aws:bedrock:...') +
       ')',
   );
   console.log('');
 
-  const key = await prompt(rl, `  Paste your key (or press Enter to skip): `);
+  const key = await prompt(rl, `  Paste your ARN (or press Enter to skip): `);
 
   if (!key) {
     console.log(
@@ -1148,25 +1146,10 @@ async function setupLlmKey(
   }
 
   // Validate prefix
-  if (key.startsWith('sk-ant-')) {
+  if (!key.startsWith('arn:aws:bedrock:')) {
     console.log(
-      styleText('red', '  That looks like an Anthropic key.') +
-        " Anthropic doesn't offer embeddings.",
-    );
-    console.log(
-      '  lat.md needs an OpenAI (' +
-        styleText('dim', 'sk-...') +
-        ') or Vercel AI Gateway (' +
-        styleText('dim', 'vck_...') +
-        ') key.',
-    );
-    return;
-  }
-
-  if (!key.startsWith('sk-') && !key.startsWith('vck_')) {
-    console.log(
-      styleText('yellow', '  Unrecognized key prefix.') +
-        ' Expected sk-... (OpenAI) or vck_... (Vercel AI Gateway).',
+      styleText('yellow', '  Unrecognized format.') +
+        ' Expected an AWS Bedrock ARN (arn:aws:bedrock:...).',
     );
     console.log('  Saving anyway — you can update it later.');
   }

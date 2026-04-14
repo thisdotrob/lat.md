@@ -72,7 +72,7 @@ export async function indexSections(
   // Embed new/changed sections
   if (toEmbed.length > 0) {
     const texts = toEmbed.map((e) => e.content);
-    const vectors = await embed(texts, provider, key);
+    const vectors = await embed(texts, provider, key, 'document');
     const now = Date.now();
 
     for (let i = 0; i < toEmbed.length; i++) {

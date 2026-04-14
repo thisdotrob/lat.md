@@ -237,7 +237,7 @@ User-level configuration is stored in `~/.config/lat/config.json` (XDG Base Dire
 
 Currently supports one field:
 
-- `llm_key` — embedding API key for semantic search, used when `LAT_LLM_KEY` env var is not set
+- `llm_key` — AWS Bedrock ARN for embedding model, used when `LAT_LLM_KEY` env var is not set
 
 Key resolution order: `LAT_LLM_KEY` > `LAT_LLM_KEY_FILE` > `LAT_LLM_KEY_HELPER` > config file `llm_key`. This applies everywhere: `lat search`, `lat check`, and the MCP `lat_search` tool.
 
@@ -317,18 +317,18 @@ Requires an LLM key resolved by [[src/config.ts#getLlmKey]] in priority order:
 3. `LAT_LLM_KEY_HELPER` env var — shell command that prints the key to stdout (10 s timeout)
 4. `llm_key` from config file (see [[cli#Configuration File]])
 
-Provider is auto-detected from the resolved key prefix:
+Provider is auto-detected from the resolved key value:
 
-- `sk-...` — OpenAI (uses `text-embedding-3-small`, 1536 dims)
-- `vck_...` — Vercel AI Gateway (uses `openai/text-embedding-3-small`, 1536 dims)
-- `sk-ant-...` — Anthropic (not supported, errors with guidance)
-- `REPLAY_LAT_LLM_KEY::<url>` — test-only replay server for offline testing
+- `arn:aws:bedrock:...` — AWS Bedrock (Cohere Embed v4, 1024 dims). Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles).
+- `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` — test-only replay server for offline testing
 
 Implementation: [[src/search/provider.ts]], [[src/config.ts]]
 
 ### Embeddings
 
-Direct `fetch()` calls to the provider's OpenAI-compatible `/v1/embeddings` endpoint. No LangChain or other framework — keeps the dependency tree minimal. Batches up to 2048 texts per request.
+Calls AWS Bedrock's `InvokeModel` API via `@aws-sdk/client-bedrock-runtime` with Cohere Embed v4 format. No LangChain or other framework.
+
+Batches up to 96 texts per request (Cohere limit). Passes `input_type: 'search_document'` when indexing and `input_type: 'search_query'` when searching. The AWS SDK is lazily imported to avoid load-time cost when search is not used.
 
 Implementation: [[src/search/embeddings.ts]]
 
@@ -336,7 +336,7 @@ Implementation: [[src/search/embeddings.ts]]
 
 Uses `@libsql/client` (Turso's libsql) in local file mode — pure JS/WASM, no native addons. Vector search is built into libsql via `F32_BLOB` column type, `libsql_vector_idx` for indexing, and `vector_top_k()` for KNN queries.
 
-Single `sections` table holds metadata, content, content hash, and the embedding vector. No separate vector table needed.
+Single `sections` table holds metadata, content, content hash, and the embedding vector. No separate vector table needed. A `meta` table stores the current vector dimensions; when the provider's dimensions change (e.g. switching providers), the sections table is dropped and recreated to force a full re-index.
 
 The database is stored at `lat.md/.cache/vectors.db` and should not be committed (included in `.gitignore` template).
 

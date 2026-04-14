@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { EmbeddingProvider } from '../src/search/provider.js';
+import { embed } from '../src/search/embeddings.js';
 
 type Manifest = {
   dimensions: number;
@@ -29,6 +30,8 @@ type ReplayServerResult = {
   server: Server;
   port: number;
   url: string;
+  /** Dimensions of the replay vectors (from manifest or capture provider) */
+  dimensions: number;
   /** Call to flush captured data (capture mode only) */
   flush: () => void;
 };
@@ -80,36 +83,20 @@ function createCaptureHandler(
   const captured = new Map<string, number[]>();
 
   const handler = async (input: string[]) => {
-    // Forward to real API
-    const resp = await fetch(`${realProvider.apiBase}/embeddings`, {
-      method: 'POST',
-      headers: realProvider.headers(realKey),
-      body: JSON.stringify({ model: realProvider.model, input }),
-    });
-
-    if (!resp.ok) {
-      const body = await resp.text();
-      return {
-        error: `Real API error (${resp.status}): ${body.slice(0, 200)}`,
-      };
-    }
-
-    const json = (await resp.json()) as {
-      data: { embedding: number[]; index: number }[];
-    };
-    const sorted = json.data.sort((a, b) => a.index - b.index);
+    // Forward to real embedding provider
+    const vectors = await embed(input, realProvider, realKey, 'document');
 
     // Record each text→vector
     for (let i = 0; i < input.length; i++) {
       const hash = textHash(input[i]);
-      captured.set(hash, sorted[i].embedding);
+      captured.set(hash, vectors[i]);
     }
 
     return {
-      data: sorted.map((item, i) => ({
+      data: vectors.map((vec, i) => ({
         object: 'embedding',
         index: i,
-        embedding: item.embedding,
+        embedding: vec,
       })),
     };
   };
@@ -153,12 +140,18 @@ export function startReplayServer(
 ): Promise<ReplayServerResult> {
   let handler: (input: string[]) => any;
   let flush = () => {};
+  let dimensions: number;
 
   if (opts?.capture) {
     const cap = createCaptureHandler(replayDir, opts.provider, opts.key);
     handler = cap.handler;
     flush = cap.flush;
+    dimensions = opts.provider.dimensions;
   } else {
+    const manifest: Manifest = JSON.parse(
+      readFileSync(join(replayDir, 'manifest.json'), 'utf-8'),
+    );
+    dimensions = manifest.dimensions;
     const replay = createReplayHandler(replayDir);
     handler = replay;
   }
@@ -200,6 +193,7 @@ export function startReplayServer(
         server,
         port: addr.port,
         url: `http://127.0.0.1:${addr.port}`,
+        dimensions,
         flush,
       });
     });

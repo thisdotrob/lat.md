@@ -8,7 +8,7 @@ Tests in `tests/search.test.ts`.
 
 ## Provider Detection
 
-Unit tests (always run). Verify `detectProvider` correctly identifies OpenAI (`sk-`), Vercel (`vck_`), rejects Anthropic (`sk-ant-`) with a helpful message, and rejects unknown prefixes.
+Unit tests (always run). Verify `detectProvider` correctly identifies Bedrock ARNs (`arn:aws:bedrock:`), extracts the region, rejects malformed ARNs, and rejects unknown key formats.
 
 ## RAG Replay Tests
 
@@ -20,7 +20,7 @@ The replay server has two modes:
 - **Replay** (default `pnpm test`): serves cached vectors from binary replay data. Matches requests by SHA-256 of input text.
 - **Capture** (`pnpm cook-test-rag`): proxies to real API via `LAT_LLM_KEY`, records all text→vector mappings, flushes binary data to `replay-data/` on teardown. Re-run this after changing how sections are chunked or which texts are embedded.
 
-The test sets `LAT_LLM_KEY` to `REPLAY_LAT_LLM_KEY::<server-url>`, which `detectProvider` routes to the local replay server. This way the entire codebase runs unmodified — same `fetch()` calls, same provider logic.
+The test sets `LAT_LLM_KEY` to `REPLAY_LAT_LLM_KEY::<dimensions>::<server-url>`, which `detectProvider` routes to the local replay server with the correct vector dimensions. This way the entire codebase runs unmodified — same embedding calls, same provider logic.
 
 ### Indexes all sections
 

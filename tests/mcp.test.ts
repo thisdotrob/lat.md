@@ -139,7 +139,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
     // Start replay server
     const replay = await startReplayServer(replayDir);
     server = replay.server;
-    const replayKey = `REPLAY_LAT_LLM_KEY::${replay.url}`;
+    const replayKey = `REPLAY_LAT_LLM_KEY::${replay.dimensions}::${replay.url}`;
 
     // Copy rag fixture to tmp so .cache doesn't pollute the repo
     tmp = mkdtempSync(join(tmpdir(), 'lat-mcp-rag-'));

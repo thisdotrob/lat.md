@@ -1,52 +1,38 @@
+export type EmbedPurpose = 'document' | 'query';
+
 export type EmbeddingProvider = {
   name: string;
-  apiBase: string;
   model: string;
   dimensions: number;
-  headers: (key: string) => Record<string, string>;
-};
-
-const openai: EmbeddingProvider = {
-  name: 'openai',
-  apiBase: 'https://api.openai.com/v1',
-  model: 'text-embedding-3-small',
-  dimensions: 1536,
-  headers: (key) => ({
-    Authorization: `Bearer ${key}`,
-    'Content-Type': 'application/json',
-  }),
-};
-
-const vercel: EmbeddingProvider = {
-  name: 'vercel',
-  apiBase: 'https://ai-gateway.vercel.sh/v1',
-  model: 'openai/text-embedding-3-small',
-  dimensions: 1536,
-  headers: (key) => ({
-    Authorization: `Bearer ${key}`,
-    'Content-Type': 'application/json',
-  }),
+  region: string;
 };
 
 export function detectProvider(key: string): EmbeddingProvider {
   if (key.startsWith('REPLAY_LAT_LLM_KEY::')) {
-    const replayUrl = key.slice('REPLAY_LAT_LLM_KEY::'.length);
+    // Format: REPLAY_LAT_LLM_KEY::<dimensions>::<url>
+    const rest = key.slice('REPLAY_LAT_LLM_KEY::'.length);
+    const sep = rest.indexOf('::');
+    const dimensions = sep !== -1 ? Number(rest.slice(0, sep)) : 1024;
     return {
       name: 'replay',
-      apiBase: replayUrl,
       model: 'replay',
-      dimensions: 1536,
-      headers: () => ({ 'Content-Type': 'application/json' }),
+      dimensions,
+      region: '',
     };
   }
-  if (key.startsWith('sk-ant-')) {
-    throw new Error(
-      "Anthropic doesn't offer an embedding model. Set LAT_LLM_KEY to an OpenAI (sk-...) or Vercel AI Gateway (vck_...) key.",
-    );
+  if (key.startsWith('arn:aws:bedrock:')) {
+    const parts = key.split(':');
+    if (parts.length < 4 || !parts[3]) {
+      throw new Error(`Cannot parse AWS region from ARN: ${key}`);
+    }
+    return {
+      name: 'bedrock',
+      model: key,
+      dimensions: 1024,
+      region: parts[3],
+    };
   }
-  if (key.startsWith('vck_')) return vercel;
-  if (key.startsWith('sk-')) return openai;
   throw new Error(
-    `Unrecognized LAT_LLM_KEY prefix. Supported: OpenAI (sk-...), Vercel AI Gateway (vck_...).`,
+    `Unrecognized LAT_LLM_KEY format. Set it to an AWS Bedrock ARN (arn:aws:bedrock:...).`,
   );
 }

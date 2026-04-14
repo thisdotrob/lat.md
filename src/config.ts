@@ -41,7 +41,7 @@ export function writeConfig(config: LatConfig): void {
 // ── Centralized LLM key resolution ─────────────────────────────────
 
 /**
- * Returns the LLM key from (in priority order):
+ * Returns the LLM key (AWS Bedrock ARN) from (in priority order):
  * 1. LAT_LLM_KEY environment variable
  * 2. LAT_LLM_KEY_FILE — path to a file containing the key
  * 3. LAT_LLM_KEY_HELPER — shell command that prints the key
