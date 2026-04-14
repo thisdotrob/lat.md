@@ -88,3 +88,15 @@ pnpm install
 pnpm build
 pnpm test
 ```
+
+### Using a local build
+
+To use your local modified version of `lat` instead of the globally installed one:
+
+```bash
+cd ~/lat.md
+pnpm build
+pnpm link --global
+```
+
+The `lat` command in your shell now points to your local build. After making source changes, just re-run `pnpm build` — no relinking needed.
