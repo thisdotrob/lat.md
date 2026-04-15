@@ -28,6 +28,7 @@ export function detectProvider(key: string): EmbeddingProvider {
     return {
       name: 'bedrock',
       model: key,
+      // Placeholder; resolveEmbeddingProvider() probes the model before indexing.
       dimensions: 1024,
       region: parts[3],
     };

@@ -1,6 +1,7 @@
 import type { CmdContext, CmdResult, Styler } from '../context.js';
 import { openDb, ensureSchema, closeDb } from '../search/db.js';
 import { detectProvider } from '../search/provider.js';
+import { resolveEmbeddingProvider } from '../search/resolve-dimensions.js';
 import { indexSections, type IndexStats } from '../search/index.js';
 import { searchSections } from '../search/search.js';
 import {
@@ -35,16 +36,17 @@ async function withDb<T>(
   const db = openDb(latDir);
 
   try {
-    await ensureSchema(db, provider.dimensions);
+    const resolved = await resolveEmbeddingProvider(provider, key);
+    await ensureSchema(db, resolved.dimensions);
 
     const countResult = await db.execute('SELECT COUNT(*) as n FROM sections');
     const isEmpty = (countResult.rows[0].n as number) === 0;
 
     progress?.beforeIndex?.(isEmpty);
-    const stats = await indexSections(latDir, db, provider, key);
+    const stats = await indexSections(latDir, db, resolved, key);
     progress?.afterIndex?.(stats, isEmpty);
 
-    return await fn(db, provider);
+    return await fn(db, resolved);
   } finally {
     await closeDb(db);
   }
