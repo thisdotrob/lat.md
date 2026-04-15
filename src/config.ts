@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import xdg from '@folder/xdg';
@@ -15,9 +14,8 @@ export function getConfigPath(): string {
 
 // ── Config read/write ───────────────────────────────────────────────
 
-export type LatConfig = {
-  llm_key?: string;
-};
+/** Reserved for future user-level settings; currently unused. */
+export type LatConfig = Record<string, unknown>;
 
 export function readConfig(): LatConfig {
   const configPath = getConfigPath();
@@ -38,44 +36,29 @@ export function writeConfig(config: LatConfig): void {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2) + '\n');
 }
 
-// ── Centralized LLM key resolution ─────────────────────────────────
+// ── Embedding model (Bedrock) ─────────────────────────────────────────
 
 /**
- * Returns the LLM key (AWS Bedrock ARN) from (in priority order):
- * 1. LAT_LLM_KEY environment variable
- * 2. LAT_LLM_KEY_FILE — path to a file containing the key
- * 3. LAT_LLM_KEY_HELPER — shell command that prints the key
- * 4. llm_key field in ~/.config/lat/config.json
- *
- * Returns undefined if none is set.
+ * Application inference profile used for all semantic search embeddings.
+ * Not configurable — every installation uses this ARN; auth is via the AWS credential chain.
  */
-export function getLlmKey(): string | undefined {
-  const envKey = process.env.LAT_LLM_KEY;
-  if (envKey) return envKey;
+export const BEDROCK_EMBEDDING_MODEL_ARN =
+  'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0';
 
-  const file = process.env.LAT_LLM_KEY_FILE;
-  if (file) {
-    const content = readFileSync(file, 'utf-8').trim();
-    if (!content) {
-      throw new Error(`LAT_LLM_KEY_FILE (${file}) is empty.`);
-    }
-    return content;
+const REPLAY_PREFIX = 'REPLAY_LAT_LLM_KEY::';
+
+/**
+ * Test-only env: when set to `REPLAY_LAT_LLM_KEY::<dimensions>::<url>`, embeddings go to the
+ * replay server instead of Bedrock. Ignored in normal use.
+ */
+export const TEST_EMBEDDING_REPLAY_ENV = 'LAT_TEST_EMBEDDING_REPLAY';
+
+/** Resolved embedding routing key: hardcoded Bedrock ARN, or replay string in tests. */
+// @lat: [[cli#search#Provider Detection]]
+export function getEmbeddingKey(): string {
+  const replay = process.env[TEST_EMBEDDING_REPLAY_ENV];
+  if (replay?.startsWith(REPLAY_PREFIX)) {
+    return replay;
   }
-
-  const helper = process.env.LAT_LLM_KEY_HELPER;
-  if (helper) {
-    const result = execSync(helper, {
-      encoding: 'utf-8',
-      timeout: 10_000,
-    }).trim();
-    if (!result) {
-      throw new Error('LAT_LLM_KEY_HELPER command returned an empty string.');
-    }
-    return result;
-  }
-
-  const config = readConfig();
-  if (config.llm_key) return config.llm_key;
-
-  return undefined;
+  return BEDROCK_EMBEDDING_MODEL_ARN;
 }

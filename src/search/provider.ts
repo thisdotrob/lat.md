@@ -33,6 +33,6 @@ export function detectProvider(key: string): EmbeddingProvider {
     };
   }
   throw new Error(
-    `Unrecognized LAT_LLM_KEY format. Set it to an AWS Bedrock ARN (arn:aws:bedrock:...).`,
+    `Unrecognized embedding key format. Expected an AWS Bedrock ARN (arn:aws:bedrock:...).`,
   );
 }

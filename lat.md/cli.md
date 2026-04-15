@@ -235,11 +235,7 @@ Implementation: [[src/cli/init.ts]], checklist menu in [[src/cli/checklist-menu.
 
 User-level configuration is stored in `~/.config/lat/config.json` (XDG Base Directory on Linux/macOS, `%APPDATA%\lat\config.json` on Windows). The `XDG_CONFIG_HOME` env var is respected if set.
 
-Currently supports one field:
-
-- `llm_key` — AWS Bedrock ARN for embedding model, used when `LAT_LLM_KEY` env var is not set
-
-Key resolution order: `LAT_LLM_KEY` > `LAT_LLM_KEY_FILE` > `LAT_LLM_KEY_HELPER` > config file `llm_key`. This applies everywhere: `lat search`, `lat check`, and the MCP `lat_search` tool.
+The file is reserved for future settings; semantic search does not load embedding model keys from it. Embeddings always use the fixed Bedrock application inference profile in [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]]. Run `lat config` to print the config path.
 
 Implementation: [[src/config.ts]]
 
@@ -261,7 +257,7 @@ Reads the hook input from stdin (JSON with `user_prompt`). Outputs JSON with `ad
 1. A directive to ALWAYS run `lat search` on the user's intent before starting work — even for seemingly straightforward tasks — because search may reveal critical design details, protocols, or constraints. Includes a hard gate: do not read files, write code, or run commands until search is done.
 2. A reminder that `lat.md/` must stay in sync with the codebase — update relevant sections and run `lat check` before finishing.
 3. If the prompt contains `[[refs]]`, resolves them inline using [[src/cli/expand.ts#expandPrompt]]
-4. Runs [[src/cli/search.ts#runSearch]] on the user prompt, then [[src/cli/section.ts#getSection]] + [[src/cli/section.ts#formatSectionOutput]] on each result — the agent gets full section content with outgoing/incoming refs before it starts work. Gracefully degrades if no LLM key is configured.
+4. Runs [[src/cli/search.ts#runSearch]] on the user prompt, then [[src/cli/section.ts#getSection]] + [[src/cli/section.ts#formatSectionOutput]] on each result — the agent gets full section content with outgoing/incoming refs before it starts work. Omits this block when search errors or returns no matches.
 
 ### Stop
 
@@ -310,14 +306,9 @@ Core search logic in [[src/cli/search.ts#runSearch]] (returns matched sections),
 
 ### Provider Detection
 
-Requires an LLM key resolved by [[src/config.ts#getLlmKey]] in priority order:
+[[src/config.ts#getEmbeddingKey]] supplies the embedding routing string; production always uses [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]] with no user override.
 
-1. `LAT_LLM_KEY` env var — direct value
-2. `LAT_LLM_KEY_FILE` env var — path to a file containing the key (read and trimmed)
-3. `LAT_LLM_KEY_HELPER` env var — shell command that prints the key to stdout (10 s timeout)
-4. `llm_key` from config file (see [[cli#Configuration File]])
-
-Provider is auto-detected from the resolved key value:
+Automated tests set `LAT_TEST_EMBEDDING_REPLAY` to `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` so calls hit a local replay server. [[src/search/provider.ts#detectProvider]] classifies the key:
 
 - `arn:aws:bedrock:...` — AWS Bedrock (Cohere Embed v4, 1024 dims). Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles).
 - `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` — test-only replay server for offline testing

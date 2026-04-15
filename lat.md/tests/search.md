@@ -18,9 +18,9 @@ The test covers indexing, hashing, vector insert, and KNN search via `tests/rag-
 
 The replay server has two modes:
 - **Replay** (default `pnpm test`): serves cached vectors from binary replay data. Matches requests by SHA-256 of input text.
-- **Capture** (`pnpm cook-test-rag`): proxies to real API via `LAT_LLM_KEY`, records all text→vector mappings, flushes binary data to `replay-data/` on teardown. Re-run this after changing how sections are chunked or which texts are embedded.
+- **Capture** (`pnpm cook-test-rag`): proxies to real Bedrock using [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]], records all text→vector mappings, flushes binary data to `replay-data/` on teardown. Requires AWS credentials. Re-run after changing how sections are chunked or which texts are embedded.
 
-The test sets `LAT_LLM_KEY` to `REPLAY_LAT_LLM_KEY::<dimensions>::<server-url>`, which `detectProvider` routes to the local replay server with the correct vector dimensions. This way the entire codebase runs unmodified — same embedding calls, same provider logic.
+Vitest passes a `REPLAY_LAT_LLM_KEY::<dimensions>::<server-url>` string as the embedding key into indexing and search APIs. The MCP RAG test sets `LAT_TEST_EMBEDDING_REPLAY` to the same shape so the CLI resolves embeddings via [[src/config.ts#getEmbeddingKey]]. `detectProvider` routes that prefix to the local replay server with the correct vector dimensions.
 
 ### Indexes all sections
 

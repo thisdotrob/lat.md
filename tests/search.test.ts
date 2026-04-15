@@ -6,6 +6,7 @@ import {
   detectProvider,
   type EmbeddingProvider,
 } from '../src/search/provider.js';
+import { BEDROCK_EMBEDDING_MODEL_ARN } from '../src/config.js';
 import { openDb, ensureSchema, closeDb } from '../src/search/db.js';
 import { indexSections } from '../src/search/index.js';
 import { searchSections } from '../src/search/search.js';
@@ -19,12 +20,12 @@ import type { Server } from 'node:http';
 describe('detectProvider', () => {
   it('detects Bedrock ARN', () => {
     const p = detectProvider(
-      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/jnja40wjqasa',
+      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
     );
     expect(p.name).toBe('bedrock');
     expect(p.dimensions).toBe(1024);
     expect(p.model).toBe(
-      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/jnja40wjqasa',
+      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
     );
     expect(p.region).toBe('us-east-1');
   });
@@ -51,8 +52,8 @@ describe('detectProvider', () => {
 //
 // Two modes:
 // - Normal (default): replays cached vectors from tests/cases/rag/replay-data/
-// - Capture (_LAT_TEST_CAPTURE_EMBEDDINGS=1): proxies to real API via LAT_LLM_KEY,
-//   records vectors to replay-data/, then runs assertions against live results
+// - Capture (_LAT_TEST_CAPTURE_EMBEDDINGS=1): proxies to real Bedrock via the fixed
+//   embedding profile ARN, records vectors to replay-data/, then runs assertions
 //
 // To re-cook: pnpm cook-test-rag
 
@@ -71,9 +72,8 @@ describe.skipIf(!canRun)('search (rag)', () => {
 
   beforeAll(async () => {
     if (capturing) {
-      // Capture mode: proxy to real API, record vectors
-      const realKey = process.env.LAT_LLM_KEY;
-      if (!realKey) throw new Error('LAT_LLM_KEY must be set in capture mode');
+      // Capture mode: proxy to real Bedrock, record vectors
+      const realKey = BEDROCK_EMBEDDING_MODEL_ARN;
       const realProvider = detectProvider(realKey);
 
       const replay = await startReplayServer(replayDir, {

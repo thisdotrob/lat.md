@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { startReplayServer, hasReplayData } from './rag-replay-server.js';
+import { TEST_EMBEDDING_REPLAY_ENV } from '../src/config.js';
 import type { Server } from 'node:http';
 
 const casesDir = join(import.meta.dirname, 'cases');
@@ -149,7 +150,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
       command: 'node',
       args: [cliPath, 'mcp'],
       cwd: tmp,
-      env: { ...process.env, LAT_LLM_KEY: replayKey },
+      env: { ...process.env, [TEST_EMBEDDING_REPLAY_ENV]: replayKey },
     });
     client = new Client({ name: 'test', version: '0.1' });
     await client.connect(transport);
@@ -181,26 +182,18 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
     expect(text).toContain('Performance');
   });
 
-  // @lat: [[tests/mcp#lat_search returns no results message]]
-  it('lat_search returns no results message when key is missing', async () => {
-    // Spin up a separate MCP server without LAT_LLM_KEY and without XDG config
-    const transport2 = new StdioClientTransport({
-      command: 'node',
-      args: [cliPath, 'mcp'],
-      cwd: tmp,
-      env: { ...process.env, LAT_LLM_KEY: '', XDG_CONFIG_HOME: tmp },
-    });
-    const client2 = new Client({ name: 'test2', version: '0.1' });
-    await client2.connect(transport2);
-
-    const result = await client2.callTool({
+  // @lat: [[tests/mcp#lat_search respects limit]]
+  it('lat_search respects limit', async () => {
+    const result = await client.callTool({
       name: 'lat_search',
-      arguments: { query: 'anything' },
+      arguments: {
+        query: 'how do we handle user login and security?',
+        limit: 1,
+      },
     });
     const text = (result.content as { type: string; text: string }[])[0].text;
-    expect(text).toContain('No API key configured');
-    expect(result.isError).toBe(true);
-
-    await client2.close();
+    const markers = text.match(/\* (Section|File):/g);
+    expect(markers?.length).toBe(1);
+    expect(result.isError).not.toBe(true);
   });
 });

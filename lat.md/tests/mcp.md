@@ -40,5 +40,5 @@ Semantic search via `lat_search` for a login/security query returns results cont
 ## lat_search finds performance section
 Semantic search for a latency/response-times query returns results containing the Performance section.
 
-## lat_search returns no results message
-When `LAT_LLM_KEY` is not set, `lat_search` returns an error with `isError: true` explaining the missing key.
+## lat_search respects limit
+Calling `lat_search` with `limit: 1` returns formatted output containing exactly one section or file preview line, so the MCP tool honors the max-results argument.
