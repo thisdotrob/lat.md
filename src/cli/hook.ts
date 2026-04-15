@@ -5,7 +5,7 @@ import { plainStyler, type CmdContext } from '../context.js';
 import { expandPrompt } from './expand.js';
 import { runSearch } from './search.js';
 import { getSection, formatSectionOutput } from './section.js';
-import { getLlmKey } from '../config.js';
+import { getReplayKey } from '../config.js';
 import { checkMd, checkCodeRefs, checkIndex, checkSections } from './check.js';
 import { SOURCE_EXTENSIONS } from '../source-parser.js';
 
@@ -62,15 +62,19 @@ async function searchAndExpand(
   ctx: CmdContext,
   userPrompt: string,
 ): Promise<string | null> {
-  let key: string | undefined;
+  let replayKey: string | undefined;
   try {
-    key = getLlmKey();
+    replayKey = getReplayKey();
   } catch {
     return null;
   }
-  if (!key) return null;
 
-  const result = await runSearch(ctx.latDir, userPrompt, key, 5);
+  let result;
+  try {
+    result = await runSearch(ctx.latDir, userPrompt, replayKey, 5);
+  } catch {
+    return null;
+  }
   if (result.matches.length === 0) return null;
 
   const parts: string[] = [

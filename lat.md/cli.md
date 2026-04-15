@@ -65,7 +65,7 @@ Validation command group. Runs all checks when invoked without a subcommand.
 
 Usage: `lat check [md|code-refs|index|sections]`
 
-Emits a stale-init warning before any errors so the user sees setup issues first. The init version check compares `INIT_VERSION` in [[src/init-version.ts]] against the version in `lat.md/.cache/lat_init.json` written by [[cli#init]]. Missing LLM key warning appears only when all checks pass. If the total check took longer than one second and ripgrep is not installed, shows a tip suggesting the user install it for faster scanning. The first output line ("Scanned ...") includes the total elapsed time (e.g. "in 250ms" or "in 1.2s").
+Emits a stale-init warning before any errors so the user sees setup issues first. The init version check compares `INIT_VERSION` in [[src/init-version.ts]] against the version in `lat.md/.cache/lat_init.json` written by [[cli#init]]. If the total check took longer than one second and ripgrep is not installed, shows a tip suggesting the user install it for faster scanning. The first output line ("Scanned ...") includes the total elapsed time (e.g. "in 250ms" or "in 1.2s").
 
 Implementation: [[src/cli/check.ts]]
 
@@ -152,7 +152,7 @@ Steps:
 3. **Command style** — if any selected agent needs a lat command reference (all except Codex), a `selectMenu` asks "How should agents run lat?" with three options: `lat` (global install, portable), the resolved local binary path, or `npx lat.md@latest` (slow but zero-install). The choice determines what command string is written into hooks, MCP configs, and Pi extensions. Non-interactive mode defaults to `local`. Choosing `global` or `npx` makes generated config files portable and safe to commit.
 4. **AGENTS.md** — created if a non-Claude agent is selected (Cursor, Copilot, Codex). Shared instruction file. Uses marker-based append mode (see below).
 5. **Per-agent setup** — configures each selected agent (see subsections below). Each step prints a brief explanation of _why_ it's needed (e.g. why a hook is used instead of CLAUDE.md, why MCP is registered alongside CLI access).
-6. **LLM key setup** — checks for an existing key (env var or [[cli#Configuration File]]), and if missing, interactively prompts the user to paste one. Explains what semantic search is and why a key is needed before asking.
+6. **Semantic search setup** — explains that search now uses a local GGUF model via `node-llama-cpp`, shows the default model URI and cache directory, and points to the optional `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` overrides. No credential prompt is needed.
 7. **Version stamp + file hashes** — writes `INIT_VERSION` and SHA-256 hashes of all template-generated files to `lat.md/.cache/lat_init.json`. On re-run, compares current file content against stored hashes: unmodified files are silently updated to the latest template; user-modified files trigger a Y/n prompt offering to overwrite with the latest template, declining suggests [[cli#gen]].
 8. **Next steps** — after all setup completes, prints agent-specific guidance for having the agent document the codebase. For Claude Code, shows a runnable `claude "..."` command. For IDE agents (Cursor, Copilot, Pi, OpenCode, Codex), shows the prompt to paste into agent chat. Both suggest running `lat check` when done.
 
@@ -235,11 +235,12 @@ Implementation: [[src/cli/init.ts]], checklist menu in [[src/cli/checklist-menu.
 
 User-level configuration is stored in `~/.config/lat/config.json` (XDG Base Directory on Linux/macOS, `%APPDATA%\lat\config.json` on Windows). The `XDG_CONFIG_HOME` env var is respected if set.
 
-Currently supports one field:
+Currently supports two optional fields:
 
-- `llm_key` — AWS Bedrock ARN for embedding model, used when `LAT_LLM_KEY` env var is not set
+- `embedding_model` — alternate GGUF model URI or local `.gguf` path
+- `embedding_cache_dir` — override for the local model cache directory
 
-Key resolution order: `LAT_LLM_KEY` > `LAT_LLM_KEY_FILE` > `LAT_LLM_KEY_HELPER` > config file `llm_key`. This applies everywhere: `lat search`, `lat check`, and the MCP `lat_search` tool.
+Resolution order: `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars first, then config file values, then defaults from [[src/config.ts#getEmbeddingConfig]]. `LAT_LLM_KEY` is reserved for replay-only test wiring.
 
 Implementation: [[src/config.ts]]
 
@@ -261,7 +262,7 @@ Reads the hook input from stdin (JSON with `user_prompt`). Outputs JSON with `ad
 1. A directive to ALWAYS run `lat search` on the user's intent before starting work — even for seemingly straightforward tasks — because search may reveal critical design details, protocols, or constraints. Includes a hard gate: do not read files, write code, or run commands until search is done.
 2. A reminder that `lat.md/` must stay in sync with the codebase — update relevant sections and run `lat check` before finishing.
 3. If the prompt contains `[[refs]]`, resolves them inline using [[src/cli/expand.ts#expandPrompt]]
-4. Runs [[src/cli/search.ts#runSearch]] on the user prompt, then [[src/cli/section.ts#getSection]] + [[src/cli/section.ts#formatSectionOutput]] on each result — the agent gets full section content with outgoing/incoming refs before it starts work. Gracefully degrades if no LLM key is configured.
+4. Runs [[src/cli/search.ts#runSearch]] on the user prompt, then [[src/cli/section.ts#getSection]] + [[src/cli/section.ts#formatSectionOutput]] on each result — the agent gets full section content with outgoing/incoming refs before it starts work. If local model setup fails, the hook skips the search context rather than blocking the prompt.
 
 ### Stop
 
@@ -310,25 +311,18 @@ Core search logic in [[src/cli/search.ts#runSearch]] (returns matched sections),
 
 ### Provider Detection
 
-Requires an LLM key resolved by [[src/config.ts#getLlmKey]] in priority order:
+Uses local embeddings by default. Provider resolution is handled by [[src/search/provider.ts#detectProvider]]:
 
-1. `LAT_LLM_KEY` env var — direct value
-2. `LAT_LLM_KEY_FILE` env var — path to a file containing the key (read and trimmed)
-3. `LAT_LLM_KEY_HELPER` env var — shell command that prints the key to stdout (10 s timeout)
-4. `llm_key` from config file (see [[cli#Configuration File]])
-
-Provider is auto-detected from the resolved key value:
-
-- `arn:aws:bedrock:...` — AWS Bedrock (Cohere Embed v4, 1024 dims). Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles).
+- No `LAT_LLM_KEY` — local GGUF model via `node-llama-cpp`, using [[src/config.ts#getEmbeddingConfig]]
 - `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` — test-only replay server for offline testing
 
 Implementation: [[src/search/provider.ts]], [[src/config.ts]]
 
 ### Embeddings
 
-Calls AWS Bedrock's `InvokeModel` API via `@aws-sdk/client-bedrock-runtime` with Cohere Embed v4 format. No LangChain or other framework.
+Calls `node-llama-cpp` directly with a local GGUF embedding model. The default model matches qmd's local setup: `hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf`.
 
-Batches up to 96 texts per request (Cohere limit). Passes `input_type: 'search_document'` when indexing and `input_type: 'search_query'` when searching. The AWS SDK is lazily imported to avoid load-time cost when search is not used.
+Query and document text are formatted before embedding using qmd-style prompts: `task: search result | query: ...` for queries and `title: ... | text: ...` for documents. The runtime resolves and caches the GGUF file on first use, validates the downloaded file starts with `GGUF`, and falls back to CPU if GPU initialization fails.
 
 Implementation: [[src/search/embeddings.ts]]
 

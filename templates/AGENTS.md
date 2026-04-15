@@ -29,7 +29,7 @@ lat check                      # validate all links and code refs
 
 Run `lat --help` when in doubt about available commands or options.
 
-If `lat search` fails because no API key is configured, explain to the user that semantic search requires an AWS Bedrock ARN provided via `LAT_LLM_KEY` (direct value), `LAT_LLM_KEY_FILE` (path to ARN file), or `LAT_LLM_KEY_HELPER` (command that prints the ARN). The value should be a Bedrock ARN (`arn:aws:bedrock:...`). If the user doesn't want to set it up, use `lat locate` for direct lookups instead.
+If `lat search` fails, explain to the user that semantic search now uses a local GGUF model via `node-llama-cpp`. Suggest checking `LAT_EMBEDDING_MODEL`, `LAT_EMBEDDING_CACHE_DIR`, local model access, or GGUF validity. If they don't want to set it up, use `lat locate` for direct lookups instead.
 
 # Syntax primer
 

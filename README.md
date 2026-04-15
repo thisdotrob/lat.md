@@ -72,12 +72,16 @@ lat mcp                         # start MCP server for editor integration
 
 ## Configuration
 
-Semantic search (`lat search`) requires an OpenAI (`sk-...`) or Vercel AI Gateway (`vck_...`) API key. The key is resolved in order:
+Semantic search (`lat search`) uses a local GGUF embedding model via `node-llama-cpp`. The default model is:
 
-1. `LAT_LLM_KEY` env var — direct value
-2. `LAT_LLM_KEY_FILE` env var — path to a file containing the key
-3. `LAT_LLM_KEY_HELPER` env var — shell command that prints the key (10s timeout)
-4. Config file — saved by `lat init`. Run `lat config` to see its location.
+`hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf`
+
+The first search downloads the model into the local cache if it is not already present. Optional overrides:
+
+1. `LAT_EMBEDDING_MODEL` — alternate Hugging Face GGUF URI or a local `.gguf` path
+2. `LAT_EMBEDDING_CACHE_DIR` — cache directory for downloaded models
+
+`LAT_LLM_KEY` is only used internally for replay-based search tests.
 
 ## Development
 

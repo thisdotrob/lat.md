@@ -24,14 +24,14 @@ export type IndexProgress = {
 
 async function withDb<T>(
   latDir: string,
-  key: string,
+  replayKey: string | undefined,
   progress: IndexProgress | undefined,
   fn: (
     db: Awaited<ReturnType<typeof openDb>>,
     provider: ReturnType<typeof detectProvider>,
   ) => Promise<T>,
 ): Promise<T> {
-  const provider = detectProvider(key);
+  const provider = detectProvider(replayKey);
   const db = openDb(latDir);
 
   try {
@@ -41,7 +41,7 @@ async function withDb<T>(
     const isEmpty = (countResult.rows[0].n as number) === 0;
 
     progress?.beforeIndex?.(isEmpty);
-    const stats = await indexSections(latDir, db, provider, key);
+    const stats = await indexSections(latDir, db, provider, replayKey);
     progress?.afterIndex?.(stats, isEmpty);
 
     return await fn(db, provider);
@@ -57,12 +57,12 @@ async function withDb<T>(
 export async function runSearch(
   latDir: string,
   query: string,
-  key: string,
+  replayKey: string | undefined,
   limit: number,
   progress?: IndexProgress,
 ): Promise<SearchResult> {
-  return withDb(latDir, key, progress, async (db, provider) => {
-    const results = await searchSections(db, query, provider, key, limit);
+  return withDb(latDir, replayKey, progress, async (db, provider) => {
+    const results = await searchSections(db, query, provider, replayKey, limit);
     if (results.length === 0) {
       return { query, matches: [] };
     }
@@ -85,10 +85,10 @@ export async function runSearch(
  */
 export async function runIndex(
   latDir: string,
-  key: string,
+  replayKey: string | undefined,
   progress?: IndexProgress,
 ): Promise<void> {
-  await withDb(latDir, key, progress, async () => {});
+  await withDb(latDir, replayKey, progress, async () => {});
 }
 
 export function cliProgress(reindex: boolean, s: Styler): IndexProgress {
@@ -123,34 +123,35 @@ export async function searchCommand(
   opts: { limit: number; reindex?: boolean },
   progress?: IndexProgress,
 ): Promise<CmdResult> {
-  const { getLlmKey, getConfigPath } = await import('../config.js');
-  let key: string | undefined;
+  const { getReplayKey } = await import('../config.js');
+  let replayKey: string | undefined;
   try {
-    key = getLlmKey();
+    replayKey = getReplayKey();
   } catch (err) {
     return { output: (err as Error).message, isError: true };
   }
-  if (!key) {
-    const s = ctx.styler;
-    return {
-      output:
-        s.red('No API key configured.') +
-        ' Provide a key via LAT_LLM_KEY, LAT_LLM_KEY_FILE, LAT_LLM_KEY_HELPER, or run ' +
-        s.cyan('lat init') +
-        (ctx.mode === 'cli'
-          ? ' to save one in ' + s.dim(getConfigPath())
-          : '') +
-        '.',
-      isError: true,
-    };
-  }
 
   if (!query) {
-    await runIndex(ctx.latDir, key, progress);
-    return { output: '' };
+    try {
+      await runIndex(ctx.latDir, replayKey, progress);
+      return { output: '' };
+    } catch (err) {
+      return { output: (err as Error).message, isError: true };
+    }
   }
 
-  const result = await runSearch(ctx.latDir, query, key, opts.limit, progress);
+  let result: SearchResult;
+  try {
+    result = await runSearch(
+      ctx.latDir,
+      query,
+      replayKey,
+      opts.limit,
+      progress,
+    );
+  } catch (err) {
+    return { output: (err as Error).message, isError: true };
+  }
 
   if (result.matches.length === 0) {
     return { output: 'No results found.' };

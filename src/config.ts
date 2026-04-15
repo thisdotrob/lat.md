@@ -1,7 +1,10 @@
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import xdg from '@folder/xdg';
+
+export const DEFAULT_EMBED_MODEL =
+  'hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf';
+export const DEFAULT_EMBED_DIMENSIONS = 768;
 
 // ── XDG config directory ────────────────────────────────────────────
 
@@ -16,7 +19,8 @@ export function getConfigPath(): string {
 // ── Config read/write ───────────────────────────────────────────────
 
 export type LatConfig = {
-  llm_key?: string;
+  embedding_model?: string;
+  embedding_cache_dir?: string;
 };
 
 export function readConfig(): LatConfig {
@@ -38,44 +42,32 @@ export function writeConfig(config: LatConfig): void {
   writeFileSync(getConfigPath(), JSON.stringify(config, null, 2) + '\n');
 }
 
-// ── Centralized LLM key resolution ─────────────────────────────────
+// ── Embedding config resolution ────────────────────────────────────
 
-/**
- * Returns the LLM key (AWS Bedrock ARN) from (in priority order):
- * 1. LAT_LLM_KEY environment variable
- * 2. LAT_LLM_KEY_FILE — path to a file containing the key
- * 3. LAT_LLM_KEY_HELPER — shell command that prints the key
- * 4. llm_key field in ~/.config/lat/config.json
- *
- * Returns undefined if none is set.
- */
-export function getLlmKey(): string | undefined {
-  const envKey = process.env.LAT_LLM_KEY;
-  if (envKey) return envKey;
+export function getDefaultEmbeddingCacheDir(): string {
+  return join(xdg().cache, 'lat', 'models');
+}
 
-  const file = process.env.LAT_LLM_KEY_FILE;
-  if (file) {
-    const content = readFileSync(file, 'utf-8').trim();
-    if (!content) {
-      throw new Error(`LAT_LLM_KEY_FILE (${file}) is empty.`);
-    }
-    return content;
-  }
+export type EmbeddingConfig = {
+  model: string;
+  cacheDir: string;
+};
 
-  const helper = process.env.LAT_LLM_KEY_HELPER;
-  if (helper) {
-    const result = execSync(helper, {
-      encoding: 'utf-8',
-      timeout: 10_000,
-    }).trim();
-    if (!result) {
-      throw new Error('LAT_LLM_KEY_HELPER command returned an empty string.');
-    }
-    return result;
-  }
-
+export function getEmbeddingConfig(): EmbeddingConfig {
   const config = readConfig();
-  if (config.llm_key) return config.llm_key;
+  return {
+    model:
+      process.env.LAT_EMBEDDING_MODEL ||
+      config.embedding_model ||
+      DEFAULT_EMBED_MODEL,
+    cacheDir:
+      process.env.LAT_EMBEDDING_CACHE_DIR ||
+      config.embedding_cache_dir ||
+      getDefaultEmbeddingCacheDir(),
+  };
+}
 
-  return undefined;
+export function getReplayKey(): string | undefined {
+  const key = process.env.LAT_LLM_KEY?.trim();
+  return key ? key : undefined;
 }

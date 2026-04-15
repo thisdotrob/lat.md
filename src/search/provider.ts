@@ -1,14 +1,22 @@
+import { DEFAULT_EMBED_DIMENSIONS, getEmbeddingConfig } from '../config.js';
+
 export type EmbedPurpose = 'document' | 'query';
 
-export type EmbeddingProvider = {
-  name: string;
-  model: string;
-  dimensions: number;
-  region: string;
-};
+export type EmbeddingProvider =
+  | {
+      name: 'local';
+      model: string;
+      dimensions: number;
+      cacheDir: string;
+    }
+  | {
+      name: 'replay';
+      model: 'replay';
+      dimensions: number;
+    };
 
-export function detectProvider(key: string): EmbeddingProvider {
-  if (key.startsWith('REPLAY_LAT_LLM_KEY::')) {
+export function detectProvider(key?: string): EmbeddingProvider {
+  if (key?.startsWith('REPLAY_LAT_LLM_KEY::')) {
     // Format: REPLAY_LAT_LLM_KEY::<dimensions>::<url>
     const rest = key.slice('REPLAY_LAT_LLM_KEY::'.length);
     const sep = rest.indexOf('::');
@@ -17,22 +25,20 @@ export function detectProvider(key: string): EmbeddingProvider {
       name: 'replay',
       model: 'replay',
       dimensions,
-      region: '',
     };
   }
-  if (key.startsWith('arn:aws:bedrock:')) {
-    const parts = key.split(':');
-    if (parts.length < 4 || !parts[3]) {
-      throw new Error(`Cannot parse AWS region from ARN: ${key}`);
-    }
-    return {
-      name: 'bedrock',
-      model: key,
-      dimensions: 1024,
-      region: parts[3],
-    };
+
+  if (key) {
+    throw new Error(
+      'LAT_LLM_KEY no longer configures production embeddings. Remove it, or use REPLAY_LAT_LLM_KEY::<dimensions>::<url> for replay tests.',
+    );
   }
-  throw new Error(
-    `Unrecognized LAT_LLM_KEY format. Set it to an AWS Bedrock ARN (arn:aws:bedrock:...).`,
-  );
+
+  const { model, cacheDir } = getEmbeddingConfig();
+  return {
+    name: 'local',
+    model,
+    cacheDir,
+    dimensions: DEFAULT_EMBED_DIMENSIONS,
+  };
 }

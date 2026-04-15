@@ -17,12 +17,7 @@ import {
   readOpenCodePluginTemplate,
   readSkillTemplate,
 } from './gen.js';
-import {
-  getLlmKey,
-  getConfigPath,
-  readConfig,
-  writeConfig,
-} from '../config.js';
+import { DEFAULT_EMBED_MODEL, getDefaultEmbeddingCacheDir } from '../config.js';
 import { writeInitMeta, readFileHash, contentHash } from '../init-version.js';
 import { getLocalVersion, fetchLatestVersion } from '../version.js';
 import { selectMenu, type SelectOption } from './select-menu.js';
@@ -1071,22 +1066,11 @@ async function setupCodex(
   if (skillHash) hashes['.codex/skills/lat-md/SKILL.md'] = skillHash;
 }
 
-// ── LLM key setup ───────────────────────────────────────────────────
+// ── Semantic search setup ───────────────────────────────────────────
 
-async function setupLlmKey(
+async function setupSemanticSearch(
   rl: ReturnType<typeof createInterface> | null,
 ): Promise<void> {
-  // Use the centralized key resolution (env var → file → helper → config)
-  const existingKey = getLlmKey();
-  if (existingKey) {
-    console.log('');
-    console.log(
-      styleText('green', 'Semantic search') + ' — LLM key found. Ready.',
-    );
-    return;
-  }
-
-  // No key found — explain what semantic search is and prompt
   console.log('');
   console.log(styleText('bold', 'Semantic search'));
   console.log('');
@@ -1096,71 +1080,39 @@ async function setupLlmKey(
       ') that lets agents find',
   );
   console.log(
-    '  relevant documentation by meaning, not just keywords. This requires an',
+    '  relevant documentation by meaning, not just keywords. It uses a',
   );
   console.log(
-    '  AWS Bedrock ARN for an embedding model. Without it, agents can still',
+    '  local GGUF embedding model via ' +
+      styleText('cyan', 'node-llama-cpp') +
+      '. The first search will',
   );
+  console.log('  download the default model if it is not cached yet.');
+  console.log('');
+  console.log('  Default model: ' + styleText('dim', DEFAULT_EMBED_MODEL));
   console.log(
-    '  use ' +
-      styleText('cyan', 'lat locate') +
-      ' for exact lookups, but will miss semantic matches.',
+    '  Cache dir:      ' + styleText('dim', getDefaultEmbeddingCacheDir()),
   );
   console.log('');
-
-  // Interactive prompt
+  console.log(
+    '  Optional overrides: ' +
+      styleText('cyan', 'LAT_EMBEDDING_MODEL') +
+      ', ' +
+      styleText('cyan', 'LAT_EMBEDDING_CACHE_DIR'),
+  );
   if (!rl) {
     console.log(
-      styleText('yellow', '  No LLM key found.') +
-        ' Set LAT_LLM_KEY env var or run ' +
-        styleText('cyan', 'lat init') +
-        ' interactively.',
-    );
-    return;
-  }
-
-  console.log(
-    '  You can provide an ARN now, or skip and set ' +
-      styleText('cyan', 'LAT_LLM_KEY') +
-      ' env var later.',
-  );
-  console.log(
-    '  Supported: AWS Bedrock ARN (' +
-      styleText('dim', 'arn:aws:bedrock:...') +
-      ')',
-  );
-  console.log('');
-
-  const key = await prompt(rl, `  Paste your ARN (or press Enter to skip): `);
-
-  if (!key) {
-    console.log(
-      styleText('dim', '  Skipped.') +
-        ' You can set ' +
+      '  Replay tests still use ' +
         styleText('cyan', 'LAT_LLM_KEY') +
-        ' later or re-run ' +
-        styleText('cyan', 'lat init') +
+        ' internally with ' +
+        styleText('dim', 'REPLAY_LAT_LLM_KEY::...') +
         '.',
     );
     return;
   }
-
-  // Validate prefix
-  if (!key.startsWith('arn:aws:bedrock:')) {
-    console.log(
-      styleText('yellow', '  Unrecognized format.') +
-        ' Expected an AWS Bedrock ARN (arn:aws:bedrock:...).',
-    );
-    console.log('  Saving anyway — you can update it later.');
-  }
-
-  // Save to config
-  const updatedConfig = { ...readConfig(), llm_key: key };
-  writeConfig(updatedConfig);
   console.log(
-    styleText('green', '  Key saved') +
-      ' to ' +
-      styleText('dim', getConfigPath()),
+    styleText('green', '  Ready.') +
+      ' No credentials are required unless you are running replay-based tests.',
   );
 }
 
@@ -1406,8 +1358,8 @@ export async function initCmd(targetDir?: string): Promise<void> {
       await setupCodex(root, latDir, fileHashes, ask, commandStyle);
     }
 
-    // Step 5: LLM key setup
-    await setupLlmKey(rl);
+    // Step 5: semantic search setup
+    await setupSemanticSearch(rl);
 
     // Record init version and file hashes so `lat check` can detect stale setups
     writeInitMeta(latDir, fileHashes);
