@@ -1,0 +1,14 @@
+version: "1.0"
+
+defaults:
+  base_dir: ../worktrees/lat_md/
+
+hooks:
+  post_create:
+    - type: symlink
+      from: node_modules
+      to: node_modules
+    - type: copy
+      from: .claude
+    - type: command
+      command: mise trust
