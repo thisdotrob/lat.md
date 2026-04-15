@@ -17,12 +17,6 @@ import {
   readOpenCodePluginTemplate,
   readSkillTemplate,
 } from './gen.js';
-import {
-  getLlmKey,
-  getConfigPath,
-  readConfig,
-  writeConfig,
-} from '../config.js';
 import { writeInitMeta, readFileHash, contentHash } from '../init-version.js';
 import { getLocalVersion, fetchLatestVersion } from '../version.js';
 import { selectMenu, type SelectOption } from './select-menu.js';
@@ -1071,97 +1065,21 @@ async function setupCodex(
   if (skillHash) hashes['.codex/skills/lat-md/SKILL.md'] = skillHash;
 }
 
-// ── LLM key setup ───────────────────────────────────────────────────
+// ── Semantic search note ─────────────────────────────────────────────
 
-async function setupLlmKey(
-  rl: ReturnType<typeof createInterface> | null,
-): Promise<void> {
-  // Use the centralized key resolution (env var → file → helper → config)
-  const existingKey = getLlmKey();
-  if (existingKey) {
-    console.log('');
-    console.log(
-      styleText('green', 'Semantic search') + ' — LLM key found. Ready.',
-    );
-    return;
-  }
-
-  // No key found — explain what semantic search is and prompt
+function printSemanticSearchNote(): void {
   console.log('');
   console.log(styleText('bold', 'Semantic search'));
   console.log('');
   console.log(
-    '  lat.md includes semantic search (' +
+    '  ' +
       styleText('cyan', 'lat search') +
-      ') that lets agents find',
+      ' uses a fixed AWS Bedrock application inference profile for embeddings.',
   );
   console.log(
-    '  relevant documentation by meaning, not just keywords. This requires an',
+    '  Ensure AWS credentials are configured (env vars, ~/.aws/credentials, or IAM role)',
   );
-  console.log(
-    '  AWS Bedrock ARN for an embedding model. Without it, agents can still',
-  );
-  console.log(
-    '  use ' +
-      styleText('cyan', 'lat locate') +
-      ' for exact lookups, but will miss semantic matches.',
-  );
-  console.log('');
-
-  // Interactive prompt
-  if (!rl) {
-    console.log(
-      styleText('yellow', '  No LLM key found.') +
-        ' Set LAT_LLM_KEY env var or run ' +
-        styleText('cyan', 'lat init') +
-        ' interactively.',
-    );
-    return;
-  }
-
-  console.log(
-    '  You can provide an ARN now, or skip and set ' +
-      styleText('cyan', 'LAT_LLM_KEY') +
-      ' env var later.',
-  );
-  console.log(
-    '  Supported: AWS Bedrock ARN (' +
-      styleText('dim', 'arn:aws:bedrock:...') +
-      ')',
-  );
-  console.log('');
-
-  const key = await prompt(rl, `  Paste your ARN (or press Enter to skip): `);
-
-  if (!key) {
-    console.log(
-      styleText('dim', '  Skipped.') +
-        ' You can set ' +
-        styleText('cyan', 'LAT_LLM_KEY') +
-        ' later or re-run ' +
-        styleText('cyan', 'lat init') +
-        '.',
-    );
-    return;
-  }
-
-  // Validate prefix
-  if (!key.startsWith('arn:aws:bedrock:')) {
-    console.log(
-      styleText('yellow', '  Unrecognized format.') +
-        ' Expected an AWS Bedrock ARN (arn:aws:bedrock:...).',
-    );
-    console.log('  Saving anyway — you can update it later.');
-  }
-
-  // Save to config
-  const updatedConfig = { ...readConfig(), llm_key: key };
-  writeConfig(updatedConfig);
-  console.log(
-    styleText('green', '  Key saved') +
-      ' to ' +
-      styleText('dim', getConfigPath()),
-  );
+  console.log('  so InvokeModel can reach Bedrock in us-east-1.');
 }
 
 // ── Post-onboarding guidance ─────────────────────────────────────────
@@ -1407,7 +1325,7 @@ export async function initCmd(targetDir?: string): Promise<void> {
     }
 
     // Step 5: LLM key setup
-    await setupLlmKey(rl);
+    printSemanticSearchNote();
 
     // Record init version and file hashes so `lat check` can detect stale setups
     writeInitMeta(latDir, fileHashes);

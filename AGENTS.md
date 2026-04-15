@@ -30,7 +30,7 @@ lat check                      # validate all links and code refs
 
 Run `lat --help` when in doubt about available commands or options.
 
-If `lat search` fails because no API key is configured, explain to the user that semantic search requires a key provided via `LAT_LLM_KEY` (direct value), `LAT_LLM_KEY_FILE` (path to key file), or `LAT_LLM_KEY_HELPER` (command that prints the key). Supported key prefixes: `sk-...` (OpenAI) or `vck_...` (Vercel). If the user doesn't want to set it up, use `lat locate` for direct lookups instead.
+If `lat search` fails, explain that it calls a fixed AWS Bedrock application inference profile in `us-east-1` and needs valid AWS credentials on the standard chain (environment variables, `~/.aws/credentials`, or IAM role). Use `lat locate` for direct name-based lookups without embeddings.
 
 # Syntax primer
 

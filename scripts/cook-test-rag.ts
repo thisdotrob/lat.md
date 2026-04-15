@@ -1,29 +1,14 @@
 /**
  * Cook replay data for the RAG test case.
  *
- * Runs the search test in capture mode — proxies to the real embedding API
- * (via LAT_LLM_KEY) and records all vectors to tests/cases/rag/replay-data/.
+ * Runs the search test in capture mode — proxies to the real Bedrock embedding API
+ * (fixed application inference profile in src/config.ts, BEDROCK_EMBEDDING_MODEL_ARN)
+ * and records all vectors to tests/cases/rag/replay-data/.
  *
- * Usage: pnpm cook-test-rag  (requires LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER)
+ * Usage: pnpm cook-test-rag  (requires AWS credentials for Bedrock in us-east-1)
  */
 
 import { execSync } from 'node:child_process';
-import { getLlmKey } from '../src/config.js';
-
-try {
-  // Resolve once up front so capture mode has a direct key value.
-  const key = getLlmKey();
-  if (!key) {
-    console.error(
-      'No API key configured. Set LAT_LLM_KEY, LAT_LLM_KEY_FILE, or LAT_LLM_KEY_HELPER.',
-    );
-    process.exit(1);
-  }
-  process.env.LAT_LLM_KEY = key;
-} catch (err) {
-  console.error((err as Error).message);
-  process.exit(1);
-}
 
 execSync('pnpm test -- tests/search.test.ts', {
   stdio: 'inherit',
