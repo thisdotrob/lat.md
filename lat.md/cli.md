@@ -310,20 +310,14 @@ Core search logic in [[src/cli/search.ts#runSearch]] (returns matched sections),
 
 Automated tests set `LAT_TEST_EMBEDDING_REPLAY` to `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` so calls hit a local replay server. [[src/search/provider.ts#detectProvider]] classifies the key:
 
-- `arn:aws:bedrock:...` — AWS Bedrock. Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles). Vector width is not hardcoded: [[src/search/resolve-dimensions.ts#resolveEmbeddingProvider]] runs one cached probe embed per model ARN per process so the SQLite column matches `embeddings.float` length (the application inference profile may differ from historical Cohere Embed v4 sizes).
+- `arn:aws:bedrock:...` — AWS Bedrock. Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles). Vector width for production is fixed in [[src/config.ts#BEDROCK_EMBEDDING_DIMENSIONS]] (must match `embeddings.float` for [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]]; there is no runtime probe).
 - `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` — test-only replay server for offline testing
 
-Implementation: [[src/search/provider.ts]], [[src/search/resolve-dimensions.ts]], [[src/config.ts]]
-
-### Bedrock vector dimensions
-
-Mismatch between assumed width (e.g. 1024) and the model’s output (e.g. 1536) caused libsql errors like `vector index(insert): dimensions are different` when indexing for `lat search` or the MCP `lat_search` tool.
-
-Resolution is a minimal Bedrock embed before `ensureSchema`, with results cached in memory for the lifetime of the process.
+Implementation: [[src/search/provider.ts]], [[src/config.ts]]
 
 ### Embeddings
 
-Calls AWS Bedrock's `InvokeModel` API via `@aws-sdk/client-bedrock-runtime` with Cohere Embed v4 format. No LangChain or other framework.
+Calls AWS Bedrock's `InvokeModel` API via `@aws-sdk/client-bedrock-runtime` with the Cohere-style request body (`texts`, `input_type`, `embedding_types`). No LangChain or other framework.
 
 Batches up to 96 texts per request (Cohere limit). Passes `input_type: 'search_document'` when indexing and `input_type: 'search_query'` when searching. The AWS SDK is lazily imported to avoid load-time cost when search is not used.
 

@@ -45,6 +45,12 @@ export function writeConfig(config: LatConfig): void {
 export const BEDROCK_EMBEDDING_MODEL_ARN =
   'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0';
 
+/**
+ * Width of each `embeddings.float` vector for the fixed Bedrock inference profile above.
+ * Must match the model; there is no runtime probe (avoids an extra InvokeModel call).
+ */
+export const BEDROCK_EMBEDDING_DIMENSIONS = 1536;
+
 const REPLAY_PREFIX = 'REPLAY_LAT_LLM_KEY::';
 
 /**

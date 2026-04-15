@@ -6,7 +6,10 @@ import {
   detectProvider,
   type EmbeddingProvider,
 } from '../src/search/provider.js';
-import { BEDROCK_EMBEDDING_MODEL_ARN } from '../src/config.js';
+import {
+  BEDROCK_EMBEDDING_DIMENSIONS,
+  BEDROCK_EMBEDDING_MODEL_ARN,
+} from '../src/config.js';
 import { openDb, ensureSchema, closeDb } from '../src/search/db.js';
 import { indexSections } from '../src/search/index.js';
 import { searchSections } from '../src/search/search.js';
@@ -23,7 +26,7 @@ describe('detectProvider', () => {
       'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
     );
     expect(p.name).toBe('bedrock');
-    expect(p.dimensions).toBe(1024);
+    expect(p.dimensions).toBe(BEDROCK_EMBEDDING_DIMENSIONS);
     expect(p.model).toBe(
       'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
     );

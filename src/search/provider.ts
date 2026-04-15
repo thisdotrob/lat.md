@@ -1,3 +1,5 @@
+import { BEDROCK_EMBEDDING_DIMENSIONS } from '../config.js';
+
 export type EmbedPurpose = 'document' | 'query';
 
 export type EmbeddingProvider = {
@@ -28,8 +30,7 @@ export function detectProvider(key: string): EmbeddingProvider {
     return {
       name: 'bedrock',
       model: key,
-      // Placeholder; resolveEmbeddingProvider() probes the model before indexing.
-      dimensions: 1024,
+      dimensions: BEDROCK_EMBEDDING_DIMENSIONS,
       region: parts[3],
     };
   }
