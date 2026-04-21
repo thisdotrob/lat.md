@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { EmbeddingProvider } from '../src/search/provider.js';
-import { embed } from '../src/search/embeddings.js';
+import { embed, type EmbedOptions } from '../src/search/embeddings.js';
 
 type Manifest = {
   dimensions: number;
@@ -78,13 +78,12 @@ function createReplayHandler(replayDir: string) {
 function createCaptureHandler(
   replayDir: string,
   realProvider: EmbeddingProvider,
-  realKey: string,
 ) {
   const captured = new Map<string, number[]>();
 
-  const handler = async (input: string[]) => {
+  const handler = async (input: string[], options: EmbedOptions) => {
     // Forward to real embedding provider
-    const vectors = await embed(input, realProvider, realKey, 'document');
+    const vectors = await embed(input, realProvider, options);
 
     // Record each text→vector
     for (let i = 0; i < input.length; i++) {
@@ -136,14 +135,14 @@ function createCaptureHandler(
 
 export function startReplayServer(
   replayDir: string,
-  opts?: { capture: true; provider: EmbeddingProvider; key: string },
+  opts?: { capture: true; provider: EmbeddingProvider },
 ): Promise<ReplayServerResult> {
-  let handler: (input: string[]) => any;
+  let handler: (input: string[], options: EmbedOptions) => any;
   let flush = () => {};
   let dimensions: number;
 
   if (opts?.capture) {
-    const cap = createCaptureHandler(replayDir, opts.provider, opts.key);
+    const cap = createCaptureHandler(replayDir, opts.provider);
     handler = cap.handler;
     flush = cap.flush;
     dimensions = opts.provider.dimensions;
@@ -153,7 +152,7 @@ export function startReplayServer(
     );
     dimensions = manifest.dimensions;
     const replay = createReplayHandler(replayDir);
-    handler = replay;
+    handler = (input) => replay(input);
   }
 
   return new Promise((resolve) => {
@@ -165,8 +164,12 @@ export function startReplayServer(
         });
         req.on('end', async () => {
           try {
-            const { input } = JSON.parse(body) as { input: string[] };
-            const result = await handler(input);
+            const { input, purpose, titles } = JSON.parse(body) as {
+              input: string[];
+              purpose?: 'document' | 'query';
+              titles?: string[];
+            };
+            const result = await handler(input, { purpose, titles });
 
             if (result.error) {
               res.writeHead(500, { 'Content-Type': 'application/json' });

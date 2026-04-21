@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { startReplayServer, hasReplayData } from './rag-replay-server.js';
-import { TEST_EMBEDDING_REPLAY_ENV } from '../src/config.js';
 import type { Server } from 'node:http';
 
 const casesDir = join(import.meta.dirname, 'cases');
@@ -140,7 +139,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
     // Start replay server
     const replay = await startReplayServer(replayDir);
     server = replay.server;
-    const replayKey = `REPLAY_LAT_LLM_KEY::${replay.dimensions}::${replay.url}`;
+    const replayKey = `REPLAY_EMBEDDING::${replay.dimensions}::${replay.url}`;
 
     // Copy rag fixture to tmp so .cache doesn't pollute the repo
     tmp = mkdtempSync(join(tmpdir(), 'lat-mcp-rag-'));
@@ -150,7 +149,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
       command: 'node',
       args: [cliPath, 'mcp'],
       cwd: tmp,
-      env: { ...process.env, [TEST_EMBEDDING_REPLAY_ENV]: replayKey },
+      env: { ...process.env, LAT_EMBEDDING_ARN: replayKey },
     });
     client = new Client({ name: 'test', version: '0.1' });
     await client.connect(transport);

@@ -62,9 +62,19 @@ async function searchAndExpand(
   ctx: CmdContext,
   userPrompt: string,
 ): Promise<string | null> {
-  const key = getEmbeddingKey();
+  let key: string | undefined;
+  try {
+    key = getEmbeddingKey();
+  } catch {
+    return null;
+  }
 
-  const result = await runSearch(ctx.latDir, userPrompt, key, 5);
+  let result;
+  try {
+    result = await runSearch(ctx.latDir, userPrompt, key, 5);
+  } catch {
+    return null;
+  }
   if (result.matches.length === 0) return null;
 
   const parts: string[] = [
