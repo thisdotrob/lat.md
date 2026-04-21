@@ -31,7 +31,7 @@ export async function indexSections(
   latDir: string,
   db: Client,
   provider: EmbeddingProvider,
-  key: string,
+  key?: string,
 ): Promise<IndexStats> {
   const projectRoot = dirname(latDir);
   const allSections = await loadAllSections(latDir);
@@ -72,7 +72,15 @@ export async function indexSections(
   // Embed new/changed sections
   if (toEmbed.length > 0) {
     const texts = toEmbed.map((e) => e.content);
-    const vectors = await embed(texts, provider, key, 'document');
+    const vectors = await embed(
+      texts,
+      provider,
+      {
+        purpose: 'document',
+        titles: toEmbed.map((entry) => entry.section.heading),
+      },
+      key,
+    );
     const now = Date.now();
 
     for (let i = 0; i < toEmbed.length; i++) {

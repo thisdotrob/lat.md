@@ -24,7 +24,7 @@ export type IndexProgress = {
 
 async function withDb<T>(
   latDir: string,
-  key: string,
+  key: string | undefined,
   progress: IndexProgress | undefined,
   fn: (
     db: Awaited<ReturnType<typeof openDb>>,
@@ -57,7 +57,7 @@ async function withDb<T>(
 export async function runSearch(
   latDir: string,
   query: string,
-  key: string,
+  key: string | undefined,
   limit: number,
   progress?: IndexProgress,
 ): Promise<SearchResult> {
@@ -85,7 +85,7 @@ export async function runSearch(
  */
 export async function runIndex(
   latDir: string,
-  key: string,
+  key: string | undefined,
   progress?: IndexProgress,
 ): Promise<void> {
   await withDb(latDir, key, progress, async () => {});
@@ -124,14 +124,28 @@ export async function searchCommand(
   progress?: IndexProgress,
 ): Promise<CmdResult> {
   const { getEmbeddingKey } = await import('../config.js');
-  const key = getEmbeddingKey();
-
-  if (!query) {
-    await runIndex(ctx.latDir, key, progress);
-    return { output: '' };
+  let key: string | undefined;
+  try {
+    key = getEmbeddingKey();
+  } catch (err) {
+    return { output: (err as Error).message, isError: true };
   }
 
-  const result = await runSearch(ctx.latDir, query, key, opts.limit, progress);
+  if (!query) {
+    try {
+      await runIndex(ctx.latDir, key, progress);
+      return { output: '' };
+    } catch (err) {
+      return { output: (err as Error).message, isError: true };
+    }
+  }
+
+  let result: SearchResult;
+  try {
+    result = await runSearch(ctx.latDir, query, key, opts.limit, progress);
+  } catch (err) {
+    return { output: (err as Error).message, isError: true };
+  }
 
   if (result.matches.length === 0) {
     return { output: 'No results found.' };

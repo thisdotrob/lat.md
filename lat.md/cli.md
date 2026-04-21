@@ -235,7 +235,12 @@ Implementation: [[src/cli/init.ts]], checklist menu in [[src/cli/checklist-menu.
 
 User-level configuration is stored in `~/.config/lat/config.json` (XDG Base Directory on Linux/macOS, `%APPDATA%\lat\config.json` on Windows). The `XDG_CONFIG_HOME` env var is respected if set.
 
-The file is reserved for future settings; semantic search does not load embedding model keys from it. Embeddings always use the fixed Bedrock application inference profile in [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]]. Run `lat config` to print the config path.
+Currently supports two optional fields for local GGUF embedding overrides:
+
+- `embedding_model` — alternate GGUF model URI (Hugging Face `hf:...` or local `.gguf` path)
+- `embedding_cache_dir` — override for the local model cache directory
+
+Resolution order: `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars first, then config file values, then defaults from [[src/config.ts#getEmbeddingConfig]]. `LAT_EMBEDDING_ARN` selects the provider: a Bedrock ARN (`arn:aws:bedrock:...`) uses Bedrock; `REPLAY_EMBEDDING::...` is for tests; unset uses local GGUF. Run `lat config` to print the config path.
 
 Implementation: [[src/config.ts]]
 
@@ -306,20 +311,21 @@ Core search logic in [[src/cli/search.ts#runSearch]] (returns matched sections),
 
 ### Provider Detection
 
-[[src/config.ts#getEmbeddingKey]] supplies the embedding routing string; production always uses [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]] with no user override.
+[[src/config.ts#getEmbeddingKey]] returns the `LAT_EMBEDDING_ARN` env var value, or `undefined` if not set. [[src/search/provider.ts#detectProvider]] classifies the key:
 
-Automated tests set `LAT_TEST_EMBEDDING_REPLAY` to `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` so calls hit a local replay server. [[src/search/provider.ts#detectProvider]] classifies the key:
-
-- `arn:aws:bedrock:...` — AWS Bedrock. Region is extracted from the ARN. Auth uses the standard AWS credential chain (env vars, `~/.aws/credentials`, IAM roles). Vector width for production is fixed in [[src/config.ts#BEDROCK_EMBEDDING_DIMENSIONS]] (must match `embeddings.float` for [[src/config.ts#BEDROCK_EMBEDDING_MODEL_ARN]]; there is no runtime probe).
-- `REPLAY_LAT_LLM_KEY::<dimensions>::<url>` — test-only replay server for offline testing
+- `undefined` — local GGUF model via `node-llama-cpp`. Model and cache dir resolved by [[src/config.ts#getEmbeddingConfig]] from `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars, config file fields, or defaults. Default model: [[src/config.ts#DEFAULT_EMBED_MODEL]].
+- `arn:aws:bedrock:...` — AWS Bedrock. Region extracted from ARN. Auth uses the standard AWS credential chain. Vector width fixed in [[src/config.ts#BEDROCK_EMBEDDING_DIMENSIONS]].
+- `REPLAY_EMBEDDING::<dimensions>::<url>` — test-only replay server for offline testing.
 
 Implementation: [[src/search/provider.ts]], [[src/config.ts]]
 
 ### Embeddings
 
-Calls AWS Bedrock's `InvokeModel` API via `@aws-sdk/client-bedrock-runtime` with the Cohere-style request body (`texts`, `input_type`, `embedding_types`). No LangChain or other framework.
+Supports two production backends and one test-only backend:
 
-Batches up to 96 texts per request (Cohere limit). Passes `input_type: 'search_document'` when indexing and `input_type: 'search_query'` when searching. The AWS SDK is lazily imported to avoid load-time cost when search is not used.
+- **Local GGUF** (default): calls `node-llama-cpp` with a local GGUF embedding model. The runtime resolves and caches the model on first use. Query and document text are formatted before embedding: `task: search result | query: ...` for queries and `title: ... | text: ...` for documents. Falls back to CPU if GPU initialization fails.
+- **AWS Bedrock**: calls `InvokeModel` via `@aws-sdk/client-bedrock-runtime` with the Cohere-style request body. Batches up to 96 texts per request. AWS SDK lazily imported.
+- **Replay** (test-only): serves pre-recorded vectors from a local HTTP server.
 
 Implementation: [[src/search/embeddings.ts]]
 

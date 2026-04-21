@@ -1,28 +1,44 @@
-import { BEDROCK_EMBEDDING_DIMENSIONS } from '../config.js';
+import {
+  BEDROCK_EMBEDDING_DIMENSIONS,
+  DEFAULT_EMBED_DIMENSIONS,
+  getEmbeddingConfig,
+} from '../config.js';
 
 export type EmbedPurpose = 'document' | 'query';
 
-export type EmbeddingProvider = {
-  name: string;
-  model: string;
-  dimensions: number;
-  region: string;
-};
+export type EmbeddingProvider =
+  | {
+      name: 'local';
+      model: string;
+      dimensions: number;
+      cacheDir: string;
+    }
+  | {
+      name: 'bedrock';
+      model: string;
+      dimensions: number;
+      region: string;
+    }
+  | {
+      name: 'replay';
+      model: 'replay';
+      dimensions: number;
+    };
 
-export function detectProvider(key: string): EmbeddingProvider {
-  if (key.startsWith('REPLAY_LAT_LLM_KEY::')) {
-    // Format: REPLAY_LAT_LLM_KEY::<dimensions>::<url>
-    const rest = key.slice('REPLAY_LAT_LLM_KEY::'.length);
+// @lat: [[cli#search#Provider Detection]]
+export function detectProvider(key?: string): EmbeddingProvider {
+  if (key?.startsWith('REPLAY_EMBEDDING::')) {
+    // Format: REPLAY_EMBEDDING::<dimensions>::<url>
+    const rest = key.slice('REPLAY_EMBEDDING::'.length);
     const sep = rest.indexOf('::');
     const dimensions = sep !== -1 ? Number(rest.slice(0, sep)) : 1024;
     return {
       name: 'replay',
       model: 'replay',
       dimensions,
-      region: '',
     };
   }
-  if (key.startsWith('arn:aws:bedrock:')) {
+  if (key?.startsWith('arn:aws:bedrock:')) {
     const parts = key.split(':');
     if (parts.length < 4 || !parts[3]) {
       throw new Error(`Cannot parse AWS region from ARN: ${key}`);
@@ -34,7 +50,17 @@ export function detectProvider(key: string): EmbeddingProvider {
       region: parts[3],
     };
   }
-  throw new Error(
-    `Unrecognized embedding key format. Expected an AWS Bedrock ARN (arn:aws:bedrock:...).`,
-  );
+  if (key) {
+    throw new Error(
+      `Unrecognized LAT_EMBEDDING_ARN format. Expected an AWS Bedrock ARN (arn:aws:bedrock:...) ` +
+        `or a replay test key (REPLAY_EMBEDDING::...).`,
+    );
+  }
+  const { model, cacheDir } = getEmbeddingConfig();
+  return {
+    name: 'local',
+    model,
+    cacheDir,
+    dimensions: DEFAULT_EMBED_DIMENSIONS,
+  };
 }

@@ -14,8 +14,10 @@ export function getConfigPath(): string {
 
 // ── Config read/write ───────────────────────────────────────────────
 
-/** Reserved for future user-level settings; currently unused. */
-export type LatConfig = Record<string, unknown>;
+export type LatConfig = {
+  embedding_model?: string;
+  embedding_cache_dir?: string;
+};
 
 export function readConfig(): LatConfig {
   const configPath = getConfigPath();
@@ -39,32 +41,62 @@ export function writeConfig(config: LatConfig): void {
 // ── Embedding model (Bedrock) ─────────────────────────────────────────
 
 /**
- * Application inference profile used for all semantic search embeddings.
- * Not configurable — every installation uses this ARN; auth is via the AWS credential chain.
+ * AWS Bedrock application inference profile for embeddings.
+ * Used when LAT_EMBEDDING_ARN is set to this ARN; auth is via the AWS credential chain.
  */
 export const BEDROCK_EMBEDDING_MODEL_ARN =
   'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0';
 
 /**
- * Width of each `embeddings.float` vector for the fixed Bedrock inference profile above.
- * Must match the model; there is no runtime probe (avoids an extra InvokeModel call).
+ * Width of each `embeddings.float` vector for the Bedrock embedding model.
+ * Must match the model; there is no runtime probe.
  */
 export const BEDROCK_EMBEDDING_DIMENSIONS = 1536;
 
-const REPLAY_PREFIX = 'REPLAY_LAT_LLM_KEY::';
+// ── Embedding model (local GGUF) ──────────────────────────────────────
+
+/** Default local GGUF embedding model (downloaded on first use). */
+export const DEFAULT_EMBED_MODEL =
+  'hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf';
+
+/** Vector width for the default local embedding model. */
+export const DEFAULT_EMBED_DIMENSIONS = 768;
+
+export function getDefaultEmbeddingCacheDir(): string {
+  return join(xdg().cache, 'lat', 'models');
+}
+
+export type EmbeddingConfig = {
+  model: string;
+  cacheDir: string;
+};
+
+export function getEmbeddingConfig(): EmbeddingConfig {
+  const config = readConfig();
+  return {
+    model:
+      process.env.LAT_EMBEDDING_MODEL ||
+      config.embedding_model ||
+      DEFAULT_EMBED_MODEL,
+    cacheDir:
+      process.env.LAT_EMBEDDING_CACHE_DIR ||
+      config.embedding_cache_dir ||
+      getDefaultEmbeddingCacheDir(),
+  };
+}
+
+// ── Embedding routing key ─────────────────────────────────────────────
 
 /**
- * Test-only env: when set to `REPLAY_LAT_LLM_KEY::<dimensions>::<url>`, embeddings go to the
- * replay server instead of Bedrock. Ignored in normal use.
+ * Returns the embedding routing key from LAT_EMBEDDING_ARN, or undefined (→ local GGUF).
+ *
+ * Key formats:
+ * - `arn:aws:bedrock:...`      — AWS Bedrock embeddings
+ * - `REPLAY_EMBEDDING::<dim>::<url>` — test-only replay server
+ * - undefined                  — local GGUF model (default)
  */
-export const TEST_EMBEDDING_REPLAY_ENV = 'LAT_TEST_EMBEDDING_REPLAY';
-
-/** Resolved embedding routing key: hardcoded Bedrock ARN, or replay string in tests. */
 // @lat: [[cli#search#Provider Detection]]
-export function getEmbeddingKey(): string {
-  const replay = process.env[TEST_EMBEDDING_REPLAY_ENV];
-  if (replay?.startsWith(REPLAY_PREFIX)) {
-    return replay;
-  }
-  return BEDROCK_EMBEDDING_MODEL_ARN;
+export function getEmbeddingKey(): string | undefined {
+  const key = process.env.LAT_EMBEDDING_ARN?.trim();
+  return key || undefined;
 }

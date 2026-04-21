@@ -49,6 +49,7 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.750.0",
     "@folder/xdg": "^4.0.1",
+    "node-llama-cpp": "3.18.1",
     "@libsql/client": "^0.17.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@repomix/tree-sitter-wasms": "^0.1.16",
@@ -62,5 +63,10 @@
     "unist-util-visit": "^5.0.0",
     "web-tree-sitter": "^0.26.6",
     "zod": "^4.3.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-llama-cpp"
+    ]
   }
 }

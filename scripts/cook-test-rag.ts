@@ -1,11 +1,10 @@
 /**
  * Cook replay data for the RAG test case.
  *
- * Runs the search test in capture mode — proxies to the real Bedrock embedding API
- * (fixed application inference profile in src/config.ts, BEDROCK_EMBEDDING_MODEL_ARN)
- * and records all vectors to tests/cases/rag/replay-data/.
+ * Runs the search test in capture mode — proxies to the local GGUF embedding
+ * model and records all vectors to tests/cases/rag/replay-data/.
  *
- * Usage: pnpm cook-test-rag  (requires AWS credentials for Bedrock in us-east-1)
+ * Usage: pnpm cook-test-rag
  */
 
 import { execSync } from 'node:child_process';
