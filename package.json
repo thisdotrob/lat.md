@@ -3,7 +3,7 @@
   "version": "0.11.0",
   "description": "A knowledge graph for your codebase, written in markdown",
   "type": "module",
-  "packageManager": "pnpm@10.30.2",
+  "packageManager": "pnpm",
   "license": "MIT",
   "author": "Yury Selivanov",
   "repository": {
@@ -62,10 +62,5 @@
     "unist-util-visit": "^5.0.0",
     "web-tree-sitter": "^0.26.6",
     "zod": "^4.3.6"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "node-llama-cpp"
-    ]
   }
 }
