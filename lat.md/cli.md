@@ -65,7 +65,7 @@ Validation command group. Runs all checks when invoked without a subcommand.
 
 Usage: `lat check [md|code-refs|index|sections]`
 
-Emits a stale-init warning before any errors so the user sees setup issues first. The init version check compares `INIT_VERSION` in [[src/init-version.ts]] against the version in `lat.md/.cache/lat_init.json` written by [[cli#init]]. Missing LLM key warning appears only when all checks pass. If the total check took longer than one second and ripgrep is not installed, shows a tip suggesting the user install it for faster scanning. The first output line ("Scanned ...") includes the total elapsed time (e.g. "in 250ms" or "in 1.2s").
+Emits a stale-init warning before any errors so the user sees setup issues first. The init version check compares `INIT_VERSION` in [[src/init-version.ts]] against the version in `lat.md/.cache/lat_init.json` written by [[cli#init]]. If the total check took longer than one second and ripgrep is not installed, shows a tip suggesting the user install it for faster scanning. The first output line ("Scanned ...") includes the total elapsed time (e.g. "in 250ms" or "in 1.2s").
 
 Implementation: [[src/cli/check.ts]]
 
@@ -152,7 +152,7 @@ Steps:
 3. **Command style** — if any selected agent needs a lat command reference (all except Codex), a `selectMenu` asks "How should agents run lat?" with three options: `lat` (global install, portable), the resolved local binary path, or `npx lat.md@latest` (slow but zero-install). The choice determines what command string is written into hooks, MCP configs, and Pi extensions. Non-interactive mode defaults to `local`. Choosing `global` or `npx` makes generated config files portable and safe to commit.
 4. **AGENTS.md** — created if a non-Claude agent is selected (Cursor, Copilot, Codex). Shared instruction file. Uses marker-based append mode (see below).
 5. **Per-agent setup** — configures each selected agent (see subsections below). Each step prints a brief explanation of _why_ it's needed (e.g. why a hook is used instead of CLAUDE.md, why MCP is registered alongside CLI access).
-6. **LLM key setup** — checks for an existing key (env var or [[cli#Configuration File]]), and if missing, interactively prompts the user to paste one. Explains what semantic search is and why a key is needed before asking.
+6. **Semantic search note** — prints a note explaining that `lat search` uses a local GGUF embedding model via `node-llama-cpp`, downloaded automatically on first use, with instructions to override via `LAT_EMBEDDING_MODEL` or `LAT_EMBEDDING_CACHE_DIR`.
 7. **Version stamp + file hashes** — writes `INIT_VERSION` and SHA-256 hashes of all template-generated files to `lat.md/.cache/lat_init.json`. On re-run, compares current file content against stored hashes: unmodified files are silently updated to the latest template; user-modified files trigger a Y/n prompt offering to overwrite with the latest template, declining suggests [[cli#gen]].
 8. **Next steps** — after all setup completes, prints agent-specific guidance for having the agent document the codebase. For Claude Code, shows a runnable `claude "..."` command. For IDE agents (Cursor, Copilot, Pi, OpenCode, Codex), shows the prompt to paste into agent chat. Both suggest running `lat check` when done.
 
@@ -240,7 +240,7 @@ Currently supports two optional fields for local GGUF embedding overrides:
 - `embedding_model` — alternate GGUF model URI (Hugging Face `hf:...` or local `.gguf` path)
 - `embedding_cache_dir` — override for the local model cache directory
 
-Resolution order: `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars first, then config file values, then defaults from [[src/config.ts#getEmbeddingConfig]]. `LAT_EMBEDDING_ARN` selects the provider: a Bedrock ARN (`arn:aws:bedrock:...`) uses Bedrock; `REPLAY_EMBEDDING::...` is for tests; unset uses local GGUF. Run `lat config` to print the config path.
+Resolution order: `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars first, then config file values, then defaults from [[src/config.ts#getEmbeddingConfig]]. `LAT_EMBEDDING_REPLAY_KEY` enables the test-only replay server (`REPLAY_EMBEDDING::...`); unset uses local GGUF. Run `lat config` to print the config path.
 
 Implementation: [[src/config.ts]]
 
@@ -311,20 +311,18 @@ Core search logic in [[src/cli/search.ts#runSearch]] (returns matched sections),
 
 ### Provider Detection
 
-[[src/config.ts#getEmbeddingKey]] returns the `LAT_EMBEDDING_ARN` env var value, or `undefined` if not set. [[src/search/provider.ts#detectProvider]] classifies the key:
+[[src/config.ts#getEmbeddingReplayKey]] returns the `LAT_EMBEDDING_REPLAY_KEY` env var value, or `undefined` if not set. [[src/search/provider.ts#detectProvider]] classifies the key:
 
 - `undefined` — local GGUF model via `node-llama-cpp`. Model and cache dir resolved by [[src/config.ts#getEmbeddingConfig]] from `LAT_EMBEDDING_MODEL` / `LAT_EMBEDDING_CACHE_DIR` env vars, config file fields, or defaults. Default model: [[src/config.ts#DEFAULT_EMBED_MODEL]].
-- `arn:aws:bedrock:...` — AWS Bedrock. Region extracted from ARN. Auth uses the standard AWS credential chain. Vector width fixed in [[src/config.ts#BEDROCK_EMBEDDING_DIMENSIONS]].
 - `REPLAY_EMBEDDING::<dimensions>::<url>` — test-only replay server for offline testing.
 
 Implementation: [[src/search/provider.ts]], [[src/config.ts]]
 
 ### Embeddings
 
-Supports two production backends and one test-only backend:
+Supports one production backend and one test-only backend:
 
 - **Local GGUF** (default): calls `node-llama-cpp` with a local GGUF embedding model. The runtime resolves and caches the model on first use. Query and document text are formatted before embedding: `task: search result | query: ...` for queries and `title: ... | text: ...` for documents. Falls back to CPU if GPU initialization fails.
-- **AWS Bedrock**: calls `InvokeModel` via `@aws-sdk/client-bedrock-runtime` with the Cohere-style request body. Batches up to 96 texts per request. AWS SDK lazily imported.
 - **Replay** (test-only): serves pre-recorded vectors from a local HTTP server.
 
 Implementation: [[src/search/embeddings.ts]]

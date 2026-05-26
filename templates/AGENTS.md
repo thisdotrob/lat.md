@@ -42,7 +42,7 @@ lat check                      # validate all links and code refs
 
 Run `lat --help` when in doubt about available commands or options.
 
-If `lat search` (or `lat_lat_search`) fails, explain that it calls a fixed AWS Bedrock application inference profile in `us-east-1` and needs valid AWS credentials on the standard chain (environment variables, `~/.aws/credentials`, or IAM role). Use `lat locate` / `lat_lat_locate` for direct name-based lookups without embeddings.
+If `lat search` (or `lat_lat_search`) fails, it may be because the local GGUF model hasn't been downloaded yet or is still loading. Use `lat locate` / `lat_lat_locate` for direct name-based lookups without embeddings.
 
 # Syntax primer
 

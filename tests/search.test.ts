@@ -7,7 +7,6 @@ import {
   type EmbeddingProvider,
 } from '../src/search/provider.js';
 import {
-  BEDROCK_EMBEDDING_DIMENSIONS,
   DEFAULT_EMBED_DIMENSIONS,
 } from '../src/config.js';
 import { openDb, ensureSchema, closeDb } from '../src/search/db.js';
@@ -44,31 +43,6 @@ describe('detectProvider', () => {
     expect(p.name).toBe('local');
     expect(p.model).toBe('/tmp/custom.gguf');
     expect(p.name === 'local' ? p.cacheDir : '').toBe('/tmp/lat-models');
-  });
-
-  it('detects Bedrock ARN', () => {
-    const p = detectProvider(
-      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
-    );
-    expect(p.name).toBe('bedrock');
-    expect(p.dimensions).toBe(BEDROCK_EMBEDDING_DIMENSIONS);
-    expect(p.model).toBe(
-      'arn:aws:bedrock:us-east-1:878877078763:application-inference-profile/nl8ntqwtw5x0',
-    );
-    expect(p.name === 'bedrock' ? p.region : '').toBe('us-east-1');
-  });
-
-  it('extracts region from Bedrock ARN', () => {
-    const p = detectProvider(
-      'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/abc',
-    );
-    expect(p.name === 'bedrock' ? p.region : '').toBe('eu-west-1');
-  });
-
-  it('rejects malformed Bedrock ARN', () => {
-    expect(() => detectProvider('arn:aws:bedrock:')).toThrow(
-      /Cannot parse AWS region/,
-    );
   });
 
   it('detects replay keys', () => {

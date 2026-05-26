@@ -123,10 +123,10 @@ export async function searchCommand(
   opts: { limit: number; reindex?: boolean },
   progress?: IndexProgress,
 ): Promise<CmdResult> {
-  const { getEmbeddingKey } = await import('../config.js');
+  const { getEmbeddingReplayKey } = await import('../config.js');
   let key: string | undefined;
   try {
-    key = getEmbeddingKey();
+    key = getEmbeddingReplayKey();
   } catch (err) {
     return { output: (err as Error).message, isError: true };
   }

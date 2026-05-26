@@ -72,7 +72,7 @@ lat mcp                         # start MCP server for editor integration
 
 ## Configuration
 
-Semantic search (`lat search`) uses a fixed AWS Bedrock application inference profile (see `BEDROCK_EMBEDDING_MODEL_ARN` in `src/config.ts`). Configure AWS credentials using the standard chain so `InvokeModel` can reach Bedrock in `us-east-1`. Run `lat config` to show the optional user config file path (reserved for future settings).
+Semantic search (`lat search`) uses a local GGUF embedding model via `node-llama-cpp` (downloaded automatically on first use). Set `LAT_EMBEDDING_MODEL` or `LAT_EMBEDDING_CACHE_DIR` to override the default model or cache location. Run `lat config` to show the optional user config file path.
 
 ## Development
 

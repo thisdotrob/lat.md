@@ -1,8 +1,4 @@
-import {
-  BEDROCK_EMBEDDING_DIMENSIONS,
-  DEFAULT_EMBED_DIMENSIONS,
-  getEmbeddingConfig,
-} from '../config.js';
+import { DEFAULT_EMBED_DIMENSIONS, getEmbeddingConfig } from '../config.js';
 
 export type EmbedPurpose = 'document' | 'query';
 
@@ -12,12 +8,6 @@ export type EmbeddingProvider =
       model: string;
       dimensions: number;
       cacheDir: string;
-    }
-  | {
-      name: 'bedrock';
-      model: string;
-      dimensions: number;
-      region: string;
     }
   | {
       name: 'replay';
@@ -38,22 +28,9 @@ export function detectProvider(key?: string): EmbeddingProvider {
       dimensions,
     };
   }
-  if (key?.startsWith('arn:aws:bedrock:')) {
-    const parts = key.split(':');
-    if (parts.length < 4 || !parts[3]) {
-      throw new Error(`Cannot parse AWS region from ARN: ${key}`);
-    }
-    return {
-      name: 'bedrock',
-      model: key,
-      dimensions: BEDROCK_EMBEDDING_DIMENSIONS,
-      region: parts[3],
-    };
-  }
   if (key) {
     throw new Error(
-      `Unrecognized LAT_EMBEDDING_ARN format. Expected an AWS Bedrock ARN (arn:aws:bedrock:...) ` +
-        `or a replay test key (REPLAY_EMBEDDING::...).`,
+      `Unrecognized LAT_EMBEDDING_REPLAY_KEY format. Expected a replay test key (REPLAY_EMBEDDING::...).`,
     );
   }
   const { model, cacheDir } = getEmbeddingConfig();

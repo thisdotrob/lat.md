@@ -5,7 +5,7 @@ import { plainStyler, type CmdContext } from '../context.js';
 import { expandPrompt } from './expand.js';
 import { runSearch } from './search.js';
 import { getSection, formatSectionOutput } from './section.js';
-import { getEmbeddingKey } from '../config.js';
+import { getEmbeddingReplayKey } from '../config.js';
 import { checkMd, checkCodeRefs, checkIndex, checkSections } from './check.js';
 import { SOURCE_EXTENSIONS } from '../source-parser.js';
 
@@ -64,7 +64,7 @@ async function searchAndExpand(
 ): Promise<string | null> {
   let key: string | undefined;
   try {
-    key = getEmbeddingKey();
+    key = getEmbeddingReplayKey();
   } catch {
     return null;
   }

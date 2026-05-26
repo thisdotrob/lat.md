@@ -2,7 +2,6 @@ import { closeSync, existsSync, mkdirSync, openSync, readSync } from 'node:fs';
 import type { EmbeddingProvider, EmbedPurpose } from './provider.js';
 
 const REPLAY_MAX_BATCH = 2048;
-const BEDROCK_MAX_BATCH = 96;
 const GGUF_MAGIC = Buffer.from('GGUF');
 
 export type EmbedOptions = {
@@ -30,9 +29,6 @@ export async function embed(
   if (provider.name === 'replay') {
     return replayEmbed(texts, key, options);
   }
-  if (provider.name === 'bedrock') {
-    return bedrockEmbed(texts, provider, options.purpose ?? 'document');
-  }
   return localEmbed(texts, provider, options);
 }
 
@@ -44,7 +40,9 @@ async function replayEmbed(
   options: EmbedOptions,
 ): Promise<number[][]> {
   if (!key) {
-    throw new Error('Replay embeddings require a REPLAY_EMBEDDING:: key.');
+    throw new Error(
+      'Replay embeddings require a LAT_EMBEDDING_REPLAY_KEY value.',
+    );
   }
 
   // Format: REPLAY_EMBEDDING::<dimensions>::<url> or REPLAY_EMBEDDING::<url>
@@ -80,68 +78,6 @@ async function replayEmbed(
     for (const item of sorted) {
       results.push(item.embedding);
     }
-  }
-
-  return results;
-}
-
-// ── Bedrock ──────────────────────────────────────────────────────────
-
-type BedrockProvider = Extract<EmbeddingProvider, { name: 'bedrock' }>;
-
-async function bedrockEmbed(
-  texts: string[],
-  provider: BedrockProvider,
-  purpose: EmbedPurpose,
-): Promise<number[][]> {
-  const { BedrockRuntimeClient, InvokeModelCommand } =
-    await import('@aws-sdk/client-bedrock-runtime');
-
-  const client = new BedrockRuntimeClient({ region: provider.region });
-  const inputType = purpose === 'query' ? 'search_query' : 'search_document';
-  const results: number[][] = [];
-
-  for (let i = 0; i < texts.length; i += BEDROCK_MAX_BATCH) {
-    const batch = texts.slice(i, i + BEDROCK_MAX_BATCH);
-
-    const command = new InvokeModelCommand({
-      modelId: provider.model,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify({
-        texts: batch,
-        input_type: inputType,
-        embedding_types: ['float'],
-      }),
-    });
-
-    let response;
-    try {
-      response = await client.send(command);
-    } catch (err) {
-      const msg = (err as Error).message ?? String(err);
-      if (
-        msg.includes('Could not resolve credentials') ||
-        msg.includes('Missing credentials')
-      ) {
-        throw new Error(
-          `AWS credentials not found. Bedrock requires credentials via ` +
-            `environment variables (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), ` +
-            `~/.aws/credentials, or an IAM role.`,
-        );
-      }
-      throw new Error(`Bedrock InvokeModel error: ${msg}`);
-    }
-
-    const body = JSON.parse(new TextDecoder().decode(response.body));
-    if (!body.embeddings?.float) {
-      throw new Error(
-        `Unexpected Bedrock response format. Expected embeddings.float array. ` +
-          `Got keys: ${Object.keys(body).join(', ')}`,
-      );
-    }
-
-    results.push(...(body.embeddings.float as number[][]));
   }
 
   return results;

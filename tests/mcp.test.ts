@@ -149,7 +149,7 @@ describe.skipIf(!canRunSearch)('mcp search (rag)', () => {
       command: 'node',
       args: [cliPath, 'mcp'],
       cwd: tmp,
-      env: { ...process.env, LAT_EMBEDDING_ARN: replayKey },
+      env: { ...process.env, LAT_EMBEDDING_REPLAY_KEY: replayKey },
     });
     client = new Client({ name: 'test', version: '0.1' });
     await client.connect(transport);

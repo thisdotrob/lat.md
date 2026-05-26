@@ -27,7 +27,7 @@ You have access to the following MCP tools from the `lat` server:
 - **lat_check** — validate all wiki links and code refs
 - **lat_refs** — find what references a section
 
-If `lat_search` fails, explain that it uses a fixed AWS Bedrock profile in `us-east-1` and requires valid AWS credentials. Use `lat_locate` for direct name-based lookups without embeddings.
+If `lat_search` fails, it may be because the local GGUF model hasn't been downloaded yet or is still loading. Use `lat_locate` for direct name-based lookups without embeddings.
 
 # Syntax primer
 

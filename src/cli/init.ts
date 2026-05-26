@@ -1074,12 +1074,12 @@ function printSemanticSearchNote(): void {
   console.log(
     '  ' +
       styleText('cyan', 'lat search') +
-      ' uses a fixed AWS Bedrock application inference profile for embeddings.',
+      ' uses a local GGUF embedding model via node-llama-cpp.',
   );
+  console.log('  The model is downloaded automatically on first use.');
   console.log(
-    '  Ensure AWS credentials are configured (env vars, ~/.aws/credentials, or IAM role)',
+    '  Set LAT_EMBEDDING_MODEL or LAT_EMBEDDING_CACHE_DIR to override the default.',
   );
-  console.log('  so InvokeModel can reach Bedrock in us-east-1.');
 }
 
 // ── Post-onboarding guidance ─────────────────────────────────────────
@@ -1324,7 +1324,7 @@ export async function initCmd(targetDir?: string): Promise<void> {
       await setupCodex(root, latDir, fileHashes, ask, commandStyle);
     }
 
-    // Step 5: LLM key setup
+    // Step 6: Semantic search note
     printSemanticSearchNote();
 
     // Record init version and file hashes so `lat check` can detect stale setups

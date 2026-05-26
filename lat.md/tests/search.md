@@ -8,7 +8,7 @@ Tests in `tests/search.test.ts`.
 
 ## Provider Detection
 
-Unit tests (always run). Verifies `detectProvider` routing: local GGUF by default, env overrides, Bedrock ARNs with region extraction, replay keys, and rejection of malformed or unknown formats.
+Unit tests (always run). Verifies `detectProvider` routing: local GGUF by default, env overrides, replay keys, and rejection of unknown formats.
 
 ## Embedding Formatting
 
@@ -28,7 +28,7 @@ The replay server has two modes:
 - **Replay** (default `pnpm test`): serves cached vectors from binary replay data. Matches requests by SHA-256 of input text.
 - **Capture** (`pnpm cook-test-rag`): proxies to the local GGUF model, records all text→vector mappings, flushes binary data to `replay-data/` on teardown. Re-run after changing how sections are chunked or which texts are embedded.
 
-Tests set `LAT_EMBEDDING_ARN` to `REPLAY_EMBEDDING::<dimensions>::<server-url>` so the entire codebase runs unmodified — same embedding calls, same provider logic. The MCP RAG test passes the same key via the `LAT_EMBEDDING_ARN` env var to the spawned MCP server process so [[src/config.ts#getEmbeddingKey]] routes to the replay server.
+The `search.test.ts` RAG tests construct the replay key string and pass it directly to `detectProvider()`, `indexSections()`, and `searchSections()` — the env var is not used. The MCP RAG test (`mcp.test.ts`) sets `LAT_EMBEDDING_REPLAY_KEY` in the env of the spawned MCP server process so [[src/config.ts#getEmbeddingReplayKey]] routes to the replay server.
 
 ### Indexes all sections
 
