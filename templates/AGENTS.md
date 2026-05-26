@@ -19,6 +19,19 @@ This project uses [lat.md](https://www.npmjs.com/package/lat.md) to maintain a s
 
 # Commands
 
+If the lat.md MCP server is available, prefer its tools over the CLI — they are faster and do not require a subprocess:
+
+| MCP tool | CLI equivalent |
+|---|---|
+| `lat_lat_search` | `lat search "natural language"` |
+| `lat_lat_locate` | `lat locate "Section Name"` |
+| `lat_lat_section` | `lat section "section-id"` |
+| `lat_lat_refs` | `lat refs "file#Section"` |
+| `lat_lat_expand` | `lat expand "user prompt text"` |
+| `lat_lat_check` | `lat check` |
+
+Fall back to the CLI when the MCP server is not available:
+
 ```bash
 lat locate "Section Name"      # find a section by name (exact, fuzzy)
 lat refs "file#Section"        # find what references a section
@@ -29,7 +42,7 @@ lat check                      # validate all links and code refs
 
 Run `lat --help` when in doubt about available commands or options.
 
-If `lat search` fails, explain that it calls a fixed AWS Bedrock application inference profile in `us-east-1` and needs valid AWS credentials on the standard chain (environment variables, `~/.aws/credentials`, or IAM role). Use `lat locate` for direct name-based lookups without embeddings.
+If `lat search` (or `lat_lat_search`) fails, explain that it calls a fixed AWS Bedrock application inference profile in `us-east-1` and needs valid AWS credentials on the standard chain (environment variables, `~/.aws/credentials`, or IAM role). Use `lat locate` / `lat_lat_locate` for direct name-based lookups without embeddings.
 
 # Syntax primer
 
