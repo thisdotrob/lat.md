@@ -8,7 +8,7 @@ TypeScript ESM project (`"type": "module"`). Strict types enforced — `tsc --no
 
 ## Package Manager
 
-pnpm is the only supported package manager. Never use npm or yarn.
+pnpm 10.34.2 is the only supported package manager. `package.json` pins it for Corepack; never use npm or yarn.
 
 ## Testing
 
