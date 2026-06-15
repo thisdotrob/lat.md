@@ -89,7 +89,6 @@ pnpm test
 To use your local modified version of `lat` instead of the globally installed one:
 
 ```bash
-cd ~/lat.md
 pnpm build
 pnpm add -g .
 ```
